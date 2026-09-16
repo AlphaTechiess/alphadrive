@@ -1,0 +1,43 @@
+[Unit]
+Description=AlphaDrive Cloud Storage Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alphadrive
+Group=alphadrive
+WorkingDirectory=/var/lib/alphadrive
+ExecStart=/usr/local/bin/alphadrive serve
+Restart=always
+RestartSec=5s
+
+# Process and resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Environment configuration
+Environment="ALPHADRIVE_LISTEN_ADDRESS=127.0.0.1:8080"
+Environment="ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data"
+EnvironmentFile=-/etc/alphadrive/alphadrive.env
+
+# Sandboxing and security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=alphadrive
+
+[Install]
+WantedBy=multi-user.target

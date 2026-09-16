@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="csrf-token" content="{{.CSRF}}">
+    <title>alphadrive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="drive-page">
+    <!-- Desktop Header -->
+    <header class="desktop-header">
+        <a href="/" class="brand-text">alphadrive</a>
+        <div class="search-bar-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="#60769e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input id="search" type="search" placeholder="" aria-label="Search files">
+        </div>
+        <div class="header-user-wrap">
+            <button class="avatar-button" aria-label="Account details" title="{{.Username}}">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#6178a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Desktop Sidebar -->
+    <aside class="desktop-sidebar">
+        <div class="sidebar-logo-wrap">
+            <img class="sidebar-icon" src="/static/images/logo.png" alt="alphadrive">
+        </div>
+        <nav class="sidebar-nav">
+            <button id="nav-drive" class="nav-item active" type="button">
+                <img src="/static/images/files.svg" alt="" class="nav-icon">
+                <span>My drive</span>
+            </button>
+            <button id="nav-trash" class="nav-item" type="button">
+                <img src="/static/images/bin.svg" alt="" class="nav-icon">
+                <span>Trash</span>
+            </button>
+        </nav>
+        <div id="sidebar-storage" class="sidebar-storage" role="button" tabindex="0" title="Click to view storage details">
+            <span id="storage-text" class="storage-label">0% of 0 B Used</span>
+            <div class="storage-track">
+                <div id="storage-bar" class="storage-fill" style="width: 0%"></div>
+            </div>
+        </div>
+        <form method="post" action="/logout" class="sidebar-logout-form">
+            <input type="hidden" name="csrf" value="{{.CSRF}}">
+            <button class="logout-link" type="submit">Log out</button>
+        </form>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="drive-main">
+        <!-- Mobile Header & Tabs -->
+        <div class="mobile-header">
+            <a href="/" class="mobile-logo-link">
+                <img src="/static/images/logo.png" alt="alphadrive" class="mobile-logo">
+            </a>
+            <div class="mobile-tabs">
+                <button id="mobile-nav-drive" class="mobile-tab-btn active" type="button">
+                    <img src="/static/images/files.svg" alt="" class="mobile-tab-icon">
+                    <span>My drive</span>
+                </button>
+                <button id="mobile-nav-trash" class="mobile-tab-btn" type="button">
+                    <img src="/static/images/bin.svg" alt="" class="mobile-tab-icon">
+                    <span>Trash</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Breadcrumbs Navigation -->
+        <div class="breadcrumbs-container">
+            <nav id="breadcrumbs" class="drive-breadcrumbs" aria-label="Breadcrumb"></nav>
+            <button id="download-all-btn" class="download-all-btn" type="button" hidden>Download all</button>
+        </div>
+
+        <div id="notice" class="drive-notice" hidden></div>
+
+        <!-- File & Folder Grid -->
+        <section id="file-list" class="file-grid" aria-live="polite">
+            <p class="grid-status">Loading files…</p>
+        </section>
+    </main>
+
+    <!-- Upload Menu Popup -->
+    <section id="upload-menu" class="upload-menu-popup" hidden>
+        <label class="menu-action-item">
+            <img src="/static/images/uploadicon.svg" alt="">
+            <span>Upload files</span>
+            <input id="upload" type="file" multiple hidden>
+        </label>
+        <label class="menu-action-item">
+            <img src="/static/images/foldericon.svg" alt="">
+            <span>Upload folder</span>
+            <input id="upload-folder" type="file" webkitdirectory directory multiple hidden>
+        </label>
+        <button id="new-folder" class="menu-action-item" type="button">
+            <img src="/static/images/foldericon.svg" alt="">
+            <span>New folder</span>
+        </button>
+    </section>
+
+    <!-- My Drive Bottom Action Bar -->
+    <aside id="drive-action-bar" class="bottom-action-bar bottom-action-bar-drive" aria-label="Drive selection actions">
+        <button id="trash-selected" class="action-btn action-trash" type="button" aria-label="Move to trash" title="Move to trash">
+            <img src="/static/images/bin.svg" alt="">
+        </button>
+        <button id="download-selected" class="action-btn action-download" type="button" aria-label="Download selected" title="Download selected">
+            <img src="/static/images/download.svg" alt="">
+        </button>
+        <button id="info-selected" class="action-btn action-info" type="button" aria-label="File information" title="File information">
+            <img src="/static/images/info.svg" alt="">
+        </button>
+        <button id="link-selected" class="action-btn action-link" type="button" aria-label="Create link" title="Create link">
+            <img src="/static/images/link.svg" alt="">
+        </button>
+    </aside>
+
+    <!-- Trash Bottom Action Bar -->
+    <aside id="trash-action-bar" class="bottom-action-bar bottom-action-bar-trash" aria-label="Trash selection actions">
+        <button id="delete-selected" class="action-btn action-delete" type="button" aria-label="Delete permanently" title="Delete permanently">
+            <img src="/static/images/bin.svg" alt="">
+        </button>
+        <button id="restore-selected" class="action-btn action-restore" type="button" aria-label="Restore" title="Restore">
+            <img src="/static/images/restore.svg" alt="">
+        </button>
+        <button id="trash-info-selected" class="action-btn action-info" type="button" aria-label="Item details" title="Item details">
+            <img src="/static/images/info.svg" alt="">
+        </button>
+    </aside>
+
+    <!-- Upload Floating Action Button (FAB) -->
+    <button id="upload-toggle" class="upload-fab-btn" type="button" aria-label="Add files">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <!-- File Information Modal Dialog -->
+    <dialog id="info-modal" class="info-dialog">
+        <div class="info-card">
+            <div class="info-header">
+                <h2 id="info-title">Item details</h2>
+                <button id="info-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            <dl class="info-meta">
+                <dt>Name</dt><dd id="info-name">-</dd>
+                <dt>Type</dt><dd id="info-kind">-</dd>
+                <dt>MIME type</dt><dd id="info-mime">-</dd>
+                <dt>Size</dt><dd id="info-size">-</dd>
+                <dt>Created</dt><dd id="info-created">-</dd>
+                <dt>Modified</dt><dd id="info-updated">-</dd>
+                <dt>Status</dt><dd id="info-status">Active</dd>
+            </dl>
+        </div>
+    </dialog>
+
+    <!-- Simple Storage Overview Modal Dialog -->
+    <dialog id="storage-modal" class="info-dialog">
+        <div class="info-card storage-card">
+            <div class="info-header">
+                <h2>Storage</h2>
+                <button id="storage-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="storage-modal-content">
+                <div class="storage-stats-grid">
+                    <div class="storage-stat-box">
+                        <span id="storage-modal-total" class="storage-stat-number">-</span>
+                        <span class="storage-stat-title">Total</span>
+                    </div>
+                    <div class="storage-stat-box">
+                        <span id="storage-modal-used" class="storage-stat-number">-</span>
+                        <span class="storage-stat-title">Used</span>
+                    </div>
+                    <div class="storage-stat-box">
+                        <span id="storage-modal-free" class="storage-stat-number">-</span>
+                        <span class="storage-stat-title">Free</span>
+                    </div>
+                </div>
+
+                <div class="storage-section-divider"></div>
+
+                <div class="storage-app-row">
+                    <span class="storage-app-name">AlphaDrive</span>
+                    <span id="storage-modal-app" class="storage-app-size">-</span>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Share Management Modal Dialog -->
+    <dialog id="share-modal" class="info-dialog">
+        <div class="info-card">
+            <div class="info-header">
+                <h2 id="share-modal-title">Share item</h2>
+                <button id="share-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            
+            <!-- Existing Share State -->
+            <div id="share-active-state" hidden>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="share-link-input" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Public link</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input id="share-link-input" type="text" readonly style="flex: 1; height: 42px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: var(--cyan-accent); font-size: 14px;">
+                        <button id="share-copy-btn" class="download-all-btn" style="margin: 0; padding: 0 16px; white-space: nowrap;" type="button">Copy</button>
+                    </div>
+                </div>
+                <div id="share-active-details" style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="share-open-btn" class="download-all-btn" style="margin: 0; background: var(--bg-active);" type="button">Open link</button>
+                    <button id="share-revoke-btn" class="download-all-btn" style="margin: 0; background: var(--danger-red); color: #fff;" type="button">Revoke link</button>
+                </div>
+            </div>
+
+            <!-- Create Share Form State -->
+            <form id="share-create-form" style="display: flex; flex-direction: column; gap: 14px;">
+                <input type="hidden" id="share-node-id" value="">
+                <div class="form-group">
+                    <label for="share-custom-slug" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Custom link slug (optional)</label>
+                    <input id="share-custom-slug" type="text" placeholder="e.g. project-docs" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
+                </div>
+                <div class="form-group">
+                    <label for="share-new-password" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Protect with password (optional)</label>
+                    <input id="share-new-password" type="password" placeholder="Leave empty for public access" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
+                </div>
+                <div class="form-group">
+                    <label for="share-new-expiry" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Expires after (optional)</label>
+                    <select id="share-new-expiry" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px; outline: none;">
+                        <option value="">Never expires</option>
+                        <option value="1h">1 hour</option>
+                        <option value="24h">24 hours (1 day)</option>
+                        <option value="7d">7 days (1 week)</option>
+                        <option value="30d">30 days (1 month)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit" style="margin-top: 8px;">Create link</button>
+            </form>
+        </div>
+    </dialog>
+
+    <!-- File Preview Modal Dialog -->
+    <dialog id="preview-modal" class="preview-dialog">
+        <div class="preview-card">
+            <div class="preview-header">
+                <div class="preview-title-wrap">
+                    <img id="preview-icon" src="/static/images/files.svg" alt="" class="preview-type-icon">
+                    <h2 id="preview-title" class="preview-title">File preview</h2>
+                </div>
+                <div class="preview-header-actions">
+                    <a id="preview-download-btn" href="#" class="preview-download-link" title="Download file" download>
+                        <img src="/static/images/download.svg" alt="Download">
+                    </a>
+                    <button id="preview-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+                </div>
+            </div>
+            <div id="preview-body" class="preview-body"></div>
+        </div>
+    </dialog>
+
+    <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
+

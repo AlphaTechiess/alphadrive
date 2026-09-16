@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{if .Share}}{{.Share.NodeName}} — alphadrive{{else}}Share — alphadrive{{end}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="public-share-page">
+    <!-- Header -->
+    <header class="desktop-header public-header">
+        <a href="/" class="brand-text">alphadrive</a>
+        {{if eq .State "file"}}
+            <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="download-all-btn" style="margin: 0;" download>Download file</a>
+        {{else if eq .State "folder"}}
+            <button id="public-download-all-top" class="download-all-btn" style="margin: 0;" type="button">Download all</button>
+        {{end}}
+    </header>
+
+    <div class="mobile-header public-mobile-header">
+        <a href="/" class="mobile-logo-link">
+            <img src="/static/images/logo.png" alt="alphadrive" class="mobile-logo">
+        </a>
+    </div>
+
+    <!-- Error / Expired / Revoked State -->
+    {{if eq .State "error"}}
+    <div class="auth-page" style="min-height: calc(100vh - 100px); padding-top: 0;">
+        <div class="auth-shell">
+            <div class="auth-card" style="text-align: center;">
+                <img src="/static/images/bin.svg" alt="" style="width: 54px; height: 54px; margin-bottom: 16px;">
+                <h1 class="auth-title" style="margin-bottom: 12px; font-size: 20px;">{{.ErrorMessage}}</h1>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">This share link may have expired, been revoked by the owner, or is no longer available.</p>
+                <a href="/" class="btn-submit" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">Go to AlphaDrive</a>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Password Prompt State -->
+    {{if eq .State "password"}}
+    <div class="auth-page" style="min-height: calc(100vh - 100px); padding-top: 0;">
+        <div class="auth-shell">
+            <h1 class="auth-title">Password protected</h1>
+            <div class="auth-card">
+                {{if .ErrorMessage}}
+                <div class="auth-error">{{.ErrorMessage}}</div>
+                {{end}}
+                <form id="unlock-form" method="post" action="/s/{{.Share.Slug}}/unlock">
+                    <div class="form-group">
+                        <label for="share-password">Enter password to view</label>
+                        <input id="share-password" name="password" type="password" required autofocus placeholder="Share password">
+                    </div>
+                    <button type="submit" class="btn-submit">Unlock</button>
+                </form>
+                <div class="auth-corner-gradient"></div>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- File View State -->
+    {{if eq .State "file"}}
+    <main class="public-file-main">
+        <div class="public-file-card">
+            <div class="public-file-header">
+                <img src="/static/images/{{.FileIcon}}" alt="" class="preview-type-icon">
+                <h1 class="public-file-title">{{.Share.NodeName}}</h1>
+                <span class="public-file-size">{{.FormattedSize}}</span>
+            </div>
+            <div id="public-preview-content" class="public-preview-container">
+                {{if .IsImage}}
+                    <img src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" alt="{{.Share.NodeName}}" class="preview-media">
+                {{else if .IsVideo}}
+                    <video src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" controls autoplay playsinline class="preview-video"></video>
+                {{else if .IsAudio}}
+                    <div class="preview-audio-container">
+                        <img src="/static/images/audio.svg" alt="" class="preview-audio-banner">
+                        <p class="preview-audio-name">{{.Share.NodeName}}</p>
+                        <audio controls autoplay src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" class="preview-audio-player"></audio>
+                    </div>
+                {{else if .IsPDF}}
+                    <iframe src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" class="preview-frame" title="{{.Share.NodeName}}"></iframe>
+                {{else if .IsText}}
+                    <pre class="preview-code"><code>{{.TextContent}}</code></pre>
+                {{else}}
+                    <div class="preview-unsupported-box">
+                        <img src="/static/images/{{.FileIcon}}" alt="" class="preview-unsupported-icon">
+                        <p class="preview-unsupported-name">{{.Share.NodeName}}</p>
+                        <p class="preview-unsupported-size">{{.FormattedSize}}</p>
+                        <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" download class="btn-submit preview-download-cta">Download File</a>
+                    </div>
+                {{end}}
+            </div>
+            <div class="public-file-footer">
+                <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="btn-submit" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; width: auto; padding: 0 36px;" download>Download ({{.FormattedSize}})</a>
+            </div>
+        </div>
+    </main>
+    {{end}}
+
+    <!-- Folder View State -->
+    {{if eq .State "folder"}}
+    <main class="drive-main public-drive-main">
+        <div class="breadcrumbs-container">
+            <nav id="public-breadcrumbs" class="drive-breadcrumbs" aria-label="Breadcrumb"></nav>
+            <button id="public-download-all-btn" class="download-all-btn" type="button">Download all</button>
+        </div>
+
+        <div id="notice" class="drive-notice" hidden></div>
+
+        <section id="public-file-list" class="file-grid" aria-live="polite">
+            <p class="grid-status">Loading shared files…</p>
+        </section>
+    </main>
+
+    <!-- Selection action bar -->
+    <aside id="public-selection-bar" class="bottom-action-bar" aria-label="Selection actions">
+        <button id="public-download-selected" class="action-btn action-download" type="button" aria-label="Download selected" title="Download selected">
+            <img src="/static/images/download.svg" alt="">
+        </button>
+        <button id="public-info-selected" class="action-btn action-info" type="button" aria-label="File information" title="File information">
+            <img src="/static/images/info.svg" alt="">
+        </button>
+    </aside>
+
+    <!-- File Information Modal Dialog -->
+    <dialog id="info-modal" class="info-dialog">
+        <div class="info-card">
+            <div class="info-header">
+                <h2 id="info-title">Item details</h2>
+                <button id="info-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            <dl class="info-meta">
+                <dt>Name</dt><dd id="info-name">-</dd>
+                <dt>Type</dt><dd id="info-kind">-</dd>
+                <dt>MIME type</dt><dd id="info-mime">-</dd>
+                <dt>Size</dt><dd id="info-size">-</dd>
+                <dt>Modified</dt><dd id="info-updated">-</dd>
+            </dl>
+        </div>
+    </dialog>
+
+    <!-- File Preview Modal Dialog -->
+    <dialog id="preview-modal" class="preview-dialog">
+        <div class="preview-card">
+            <div class="preview-header">
+                <div class="preview-title-wrap">
+                    <img id="preview-icon" src="/static/images/files.svg" alt="" class="preview-type-icon">
+                    <h2 id="preview-title" class="preview-title">File preview</h2>
+                </div>
+                <div class="preview-header-actions">
+                    <a id="preview-download-btn" href="#" class="preview-download-link" title="Download file" download>
+                        <img src="/static/images/download.svg" alt="Download">
+                    </a>
+                    <button id="preview-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+                </div>
+            </div>
+            <div id="preview-body" class="preview-body"></div>
+        </div>
+    </dialog>
+
+    <script>
+        window.ALPHADRIVE_SHARE_SLUG = "{{.Share.Slug}}";
+        window.ALPHADRIVE_SHARE_ROOT = "{{.Share.NodeID}}";
+    </script>
+    <script type="module" src="/static/js/public.js"></script>
+    {{end}}
+</body>
+</html>

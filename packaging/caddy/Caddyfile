@@ -1,0 +1,38 @@
+# AlphaDrive Caddy Reverse Proxy Configuration
+# Replace drive.example.com with your actual public domain or VPS IP
+
+drive.example.com {
+    # Automatic Let's Encrypt / ZeroSSL TLS certificates
+    # If using local/internal IP or self-signed, replace with `tls internal` or `:80`
+
+    # Security Headers (AlphaDrive also sets these internally)
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Enable response compression for static web assets and text
+    encode zstd gzip
+
+    # Configure maximum client request body size (e.g., 10GB for large uploads)
+    request_body {
+        max_size 10GB
+    }
+
+    # Reverse proxy all requests to AlphaDrive daemon
+    reverse_proxy 127.0.0.1:8080 {
+        # Transparent proxy header forwarding
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Timeouts suitable for large uploads and range streaming
+        transport http {
+            read_buffer 16384
+            response_header_timeout 300s
+        }
+    }
+}

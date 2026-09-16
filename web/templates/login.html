@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Login — alphadrive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="auth-page">
+    <div class="auth-shell">
+        <img class="auth-logo" src="/static/images/logo.png" alt="alphadrive">
+        <h1 class="auth-title">Login</h1>
+        <div class="auth-card">
+            {{if .Error}}
+            <p class="auth-error">{{.Error}}</p>
+            {{end}}
+            <form method="post" action="/login">
+                <input type="hidden" name="csrf" value="{{.CSRF}}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input id="username" name="username" autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input id="password" type="password" name="password" autocomplete="current-password" required>
+                </div>
+                <button class="btn-submit" type="submit">Submit</button>
+            </form>
+            <div class="auth-corner-gradient" aria-hidden="true"></div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+
+      - name: Verify code formatting (gofmt)
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "The following files are not properly formatted:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run all tests with race detector
+        run: go test -v -race ./...
+
+      - name: Build Linux amd64 binary
+        run: |
+          go run scripts/build.go -os linux -arch amd64 -output dist/alphadrive-linux-amd64
+
+      - name: Build Linux arm64 binary
+        run: |
+          go run scripts/build.go -os linux -arch arm64 -output dist/alphadrive-linux-arm64
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist && sha256sum * > SHA256SUMS
+          cat SHA256SUMS

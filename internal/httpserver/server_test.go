@@ -287,20 +287,19 @@ func TestAuthAndSessionFlow(t *testing.T) {
 
 	// /api/me verification
 	var me struct {
-		Username       string `json:"username"`
-		RootID         string `json:"root_id"`
-		UsedBytes      int64  `json:"used_bytes"`
-		QuotaBytes     int64  `json:"quota_bytes"`
-		ServerTotal    uint64 `json:"server_total"`
-		ServerUsed     uint64 `json:"server_used"`
-		ServerFree     uint64 `json:"server_free"`
-		AlphadriveUsed int64  `json:"alphadrive_used"`
+		Username                  string `json:"username"`
+		RootID                    string `json:"root_id"`
+		UsedBytes                 int64  `json:"used_bytes"`
+		AlphadriveUsedBytes       int64  `json:"alphadrive_used_bytes"`
+		StorageDetectionAvailable bool   `json:"storage_detection_available"`
+		FilesystemTotalBytes      uint64 `json:"filesystem_total_bytes"`
+		ServerTotal               uint64 `json:"server_total"`
 	}
 	status := ac.doJSON(t, "GET", rig.server.URL+"/api/me", nil, &me)
 	if status != http.StatusOK {
 		t.Fatalf("expected 200, got %d", status)
 	}
-	if me.Username != username || me.ServerTotal == 0 || me.QuotaBytes == 0 || me.UsedBytes != 0 {
+	if me.Username != username || me.UsedBytes != 0 || me.AlphadriveUsedBytes != 0 {
 		t.Fatalf("unexpected me response: %+v", me)
 	}
 }
@@ -805,5 +804,181 @@ func TestHealthzAndDoctor(t *testing.T) {
 	ok := doctor.Run(context.Background(), rig.cfg, rig.db.DB, &docBuf)
 	if !ok {
 		t.Fatalf("expected doctor diagnostics to pass, output:\n%s", docBuf.String())
+	}
+}
+
+func TestShareValidationAndStorageAPIs(t *testing.T) {
+	rig := setupTestRig(t)
+	username := "dave"
+	password := "Password123456"
+	rig.createUser(t, username, password)
+	ac := rig.login(t, username, password)
+
+	node, _ := ac.uploadFile(t, rig.server.URL, ac.rootID, "sample.txt", "data")
+
+	// 1. Invalid Expiry -> 400
+	var errResp map[string]any
+	status := ac.doJSON(t, "POST", rig.server.URL+"/api/shares", map[string]string{
+		"node_id": node.ID,
+		"expiry":  "invalid-duration-format",
+	}, &errResp)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid expiry, got %d", status)
+	}
+
+	// 2. Short Share Password (<12 chars) -> 400
+	status = ac.doJSON(t, "POST", rig.server.URL+"/api/shares", map[string]string{
+		"node_id":  node.ID,
+		"password": "short",
+	}, &errResp)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for short share password, got %d", status)
+	}
+
+	// 3. Invalid Slug (underscores) -> 400
+	status = ac.doJSON(t, "POST", rig.server.URL+"/api/shares", map[string]string{
+		"node_id":     node.ID,
+		"custom_slug": "slug_with_underscore",
+	}, &errResp)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for slug with underscore, got %d", status)
+	}
+
+	// 4. Valid Share with 24h Expiry -> 201
+	var validShare struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+	}
+	status = ac.doJSON(t, "POST", rig.server.URL+"/api/shares", map[string]string{
+		"node_id":     node.ID,
+		"custom_slug": "valid-slug-2026",
+		"expiry":      "24h",
+	}, &validShare)
+	if status != http.StatusCreated {
+		t.Fatalf("expected 201 for valid share, got %d", status)
+	}
+
+	// 5. Test /api/me storage telemetry fields
+	var meResp struct {
+		StorageDetectionAvailable bool   `json:"storage_detection_available"`
+		AlphadriveUsedBytes       int64  `json:"alphadrive_used_bytes"`
+		FilesystemTotalBytes      *int64 `json:"filesystem_total_bytes"`
+	}
+	ac.doJSON(t, "GET", rig.server.URL+"/api/me", nil, &meResp)
+	if meResp.AlphadriveUsedBytes != 4 { // "data" = 4 bytes
+		t.Fatalf("expected alphadrive_used_bytes=4, got %d", meResp.AlphadriveUsedBytes)
+	}
+}
+
+func TestOwnerSetupFlow(t *testing.T) {
+	rig := setupTestRig(t)
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookie jar: %v", err)
+	}
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// 1. Initial request to / should redirect to /setup (303 See Other)
+	resp, err := client.Get(rig.server.URL + "/")
+	if err != nil {
+		t.Fatalf("get /: %v", err)
+	}
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/setup" {
+		t.Fatalf("expected 303 redirect to /setup, got status %d, loc %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+
+	// 2. GET /setup should return 200 with setup page and set CSRF cookie
+	resp, err = client.Get(rig.server.URL + "/setup")
+	if err != nil {
+		t.Fatalf("get /setup: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from /setup, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "Owner Setup") {
+		t.Fatalf("expected setup page body, got %s", string(body))
+	}
+
+	// Extract CSRF cookie
+	serverURL, _ := url.Parse(rig.server.URL)
+	var csrfToken string
+	for _, c := range jar.Cookies(serverURL) {
+		if c.Name == "alphadrive_login_csrf" {
+			csrfToken = c.Value
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("missing alphadrive_login_csrf cookie")
+	}
+
+	// 3. POST /setup with mismatched passwords should return 400
+	form := url.Values{
+		"csrf":             {csrfToken},
+		"name":             {"System Administrator"},
+		"username":         {"sysadmin"},
+		"password":         {"SuperSecretPassword123!"},
+		"confirm_password": {"DifferentPassword123!"},
+	}
+	resp, err = client.PostForm(rig.server.URL+"/setup", form)
+	if err != nil {
+		t.Fatalf("post /setup: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 on mismatched password, got %d", resp.StatusCode)
+	}
+
+	// 4. POST /setup with password < 12 chars should return 400
+	form.Set("password", "shortpass")
+	form.Set("confirm_password", "shortpass")
+	resp, err = client.PostForm(rig.server.URL+"/setup", form)
+	if err != nil {
+		t.Fatalf("post /setup: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 on short password, got %d", resp.StatusCode)
+	}
+
+	// 5. POST /setup with valid credentials creates owner, sets session, and redirects to /
+	form.Set("password", "SuperSecretPassword123!")
+	form.Set("confirm_password", "SuperSecretPassword123!")
+	resp, err = client.PostForm(rig.server.URL+"/setup", form)
+	if err != nil {
+		t.Fatalf("post /setup: %v", err)
+	}
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("expected 303 redirect to /, got status %d, loc %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+
+	// 6. Check authenticated session on /api/me
+	req, _ := http.NewRequest("GET", rig.server.URL+"/api/me", nil)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("get /api/me: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from /api/me, got %d", resp.StatusCode)
+	}
+	var me struct {
+		Username string `json:"username"`
+		Name     string `json:"name"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&me)
+	if me.Username != "sysadmin" || me.Name != "System Administrator" {
+		t.Fatalf("expected sysadmin with name 'System Administrator', got %+v", me)
+	}
+
+	// 7. GET /setup now that a user exists should redirect to / (since logged in)
+	resp, err = client.Get(rig.server.URL + "/setup")
+	if err != nil {
+		t.Fatalf("get /setup: %v", err)
+	}
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("expected 303 redirect to / after setup, got %d loc %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
 }

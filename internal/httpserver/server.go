@@ -4,11 +4,9 @@ import (
 	"archive/zip"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,8 +42,8 @@ type Server struct {
 	shareAttempts *attempts
 }
 type principal struct {
-	UserID, Username string
-	CSRF             string
+	UserID, Username, Name string
+	CSRF                   string
 }
 type contextKey string
 
@@ -66,7 +64,12 @@ func New(cfg config.Config, db *sql.DB, fileService *files.Service, shareService
 }
 
 func (s *Server) CreateUser(ctx context.Context, username, passwordHash string, admin bool) error {
+	return s.CreateUserWithName(ctx, "", username, passwordHash, admin)
+}
+
+func (s *Server) CreateUserWithName(ctx context.Context, name, username, passwordHash string, admin bool) error {
 	username = strings.TrimSpace(username)
+	name = strings.TrimSpace(name)
 	if username == "" || len(username) > 64 {
 		return fmt.Errorf("invalid username")
 	}
@@ -80,7 +83,7 @@ func (s *Server) CreateUser(ctx context.Context, username, passwordHash string, 
 		return err
 	}
 	now := time.Now().UTC().Unix()
-	_, err = s.db.ExecContext(ctx, `INSERT INTO users(id,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?,?,?,?,?)`, id, username, passwordHash, boolInt(admin), now, now)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO users(id,name,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, id, name, username, passwordHash, boolInt(admin), now, now)
 	if err != nil {
 		return err
 	}
@@ -125,9 +128,18 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		data, err := assets.Images.ReadFile("images/logo.png")
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write(data)
 	})
 	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler()))
+	mux.HandleFunc("GET /setup", s.setupPage)
+	mux.HandleFunc("POST /setup", s.setup)
 	mux.HandleFunc("GET /login", s.loginPage)
 	mux.HandleFunc("POST /login", s.login)
 	mux.HandleFunc("POST /logout", s.require(s.csrf(s.logout)))
@@ -171,6 +183,7 @@ func (s *Server) Serve(ctx context.Context) error {
 func staticHandler() http.Handler {
 	static, _ := fs.Sub(web.Files, "static")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 		if strings.HasPrefix(r.URL.Path, "images/") {
 			http.FileServer(http.FS(assets.Images)).ServeHTTP(w, r)
 			return
@@ -179,14 +192,160 @@ func staticHandler() http.Handler {
 	})
 }
 
+func (s *Server) hasUsers(ctx context.Context) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (s *Server) setupPage(w http.ResponseWriter, r *http.Request) {
+	hasUsers, _ := s.hasUsers(r.Context())
+	if hasUsers {
+		if _, ok := s.loadPrincipal(r); ok {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+		} else {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+		}
+		return
+	}
+	s.renderSetup(w, r, "", "", "", http.StatusOK)
+}
+
+func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, errMsg, name, username string, status int) {
+	raw := s.ensureLoginCSRFCookie(w, r)
+	w.WriteHeader(status)
+	data := map[string]any{
+		"CSRF":     raw,
+		"Error":    errMsg,
+		"Name":     name,
+		"Username": username,
+	}
+	s.render(w, "setup.html", data)
+}
+
+func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.renderSetup(w, r, "Invalid setup request.", "", "", http.StatusBadRequest)
+		return
+	}
+	if !validLoginCSRF(r) {
+		s.renderSetup(w, r, "Your form expired. Please try again.", "", "", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	if name == "" {
+		s.renderSetup(w, r, "Please enter your name.", name, username, http.StatusBadRequest)
+		return
+	}
+	if username == "" || len(username) < 3 || len(username) > 32 {
+		s.renderSetup(w, r, "Username must be between 3 and 32 characters.", name, username, http.StatusBadRequest)
+		return
+	}
+	for _, ch := range username {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-' || ch == '.') {
+			s.renderSetup(w, r, "Username contains invalid characters.", name, username, http.StatusBadRequest)
+			return
+		}
+	}
+	if len(password) < 12 {
+		s.renderSetup(w, r, "Password must be at least 12 characters long.", name, username, http.StatusBadRequest)
+		return
+	}
+	if password != confirmPassword {
+		s.renderSetup(w, r, "Passwords do not match.", name, username, http.StatusBadRequest)
+		return
+	}
+
+	tx, err := s.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	defer tx.Rollback()
+
+	var userCount int
+	if err := tx.QueryRowContext(r.Context(), `SELECT count(*) FROM users`).Scan(&userCount); err != nil {
+		internalError(w, r, err)
+		return
+	}
+	if userCount > 0 {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	passwordHash, err := auth.HashPassword(password)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	userID, err := id()
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	now := time.Now().UTC()
+	_, err = tx.ExecContext(r.Context(), `INSERT INTO users(id,name,username,password_hash,is_admin,created_at,updated_at,last_login_at) VALUES(?,?,?,?,1,?,?,?)`, userID, name, username, passwordHash, now.Unix(), now.Unix(), now.Unix())
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	raw, tokenHash, err := auth.Token()
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	sessionID, err := id()
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	expires := now.Add(s.cfg.SessionMaxLifetime)
+	_, err = tx.ExecContext(r.Context(), `INSERT INTO sessions(id,user_id,token_hash,csrf_secret,created_at,last_seen_at,expires_at) VALUES(?,?,?,?,?,?,?)`, sessionID, userID, tokenHash, tokenHash, now.Unix(), now.Unix(), expires.Unix())
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	_ = s.files.EnsureRoot(r.Context(), userID)
+
+	s.setSessionCookie(w, raw, expires)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.principal(r); ok {
+	if _, ok := s.loadPrincipal(r); ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	hasUsers, _ := s.hasUsers(r.Context())
+	if !hasUsers {
+		http.Redirect(w, r, "/setup", http.StatusSeeOther)
 		return
 	}
 	s.renderLogin(w, r, "", http.StatusOK)
 }
+
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	hasUsers, _ := s.hasUsers(r.Context())
+	if !hasUsers {
+		http.Redirect(w, r, "/setup", http.StatusSeeOther)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		s.renderLoginError(w, r, "Invalid sign-in request.", http.StatusBadRequest)
 		return
@@ -249,29 +408,34 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	diskStats, err := system.GetDiskStats(s.cfg.DataDir)
-	if err != nil {
-		total := uint64(s.cfg.StorageQuotaBytes)
-		used := uint64(alphadriveUsed)
-		free := uint64(0)
-		if total > used {
-			free = total - used
-		}
-		diskStats = system.DiskStats{
-			TotalBytes: total,
-			FreeBytes:  free,
-			UsedBytes:  used,
-		}
+	detectionAvailable := (err == nil)
+
+	resp := map[string]any{
+		"username":                    p.Username,
+		"name":                        p.Name,
+		"root_id":                     files.RootID(p.UserID),
+		"alphadrive_used_bytes":       alphadriveUsed,
+		"used_bytes":                  alphadriveUsed,
+		"storage_detection_available": detectionAvailable,
 	}
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"username":        p.Username,
-		"root_id":         files.RootID(p.UserID),
-		"used_bytes":      alphadriveUsed,
-		"quota_bytes":     diskStats.TotalBytes,
-		"server_total":    diskStats.TotalBytes,
-		"server_used":     diskStats.UsedBytes,
-		"server_free":     diskStats.FreeBytes,
-		"alphadrive_used": alphadriveUsed,
-	})
+
+	if detectionAvailable {
+		resp["filesystem_total_bytes"] = diskStats.TotalBytes
+		resp["filesystem_used_bytes"] = diskStats.UsedBytes
+		resp["filesystem_free_bytes"] = diskStats.FreeBytes
+		resp["server_total"] = diskStats.TotalBytes
+		resp["server_used"] = diskStats.UsedBytes
+		resp["server_free"] = diskStats.FreeBytes
+	} else {
+		resp["filesystem_total_bytes"] = nil
+		resp["filesystem_used_bytes"] = nil
+		resp["filesystem_free_bytes"] = nil
+		resp["server_total"] = nil
+		resp["server_used"] = nil
+		resp["server_free"] = nil
+	}
+
+	jsonResponse(w, http.StatusOK, resp)
 }
 func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 	p, _ := s.principal(r)
@@ -494,7 +658,12 @@ func (s *Server) require(next http.HandlerFunc) http.HandlerFunc {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				apiError(w, http.StatusUnauthorized, "unauthenticated", "Please sign in.")
 			} else {
-				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				hasUsers, _ := s.hasUsers(r.Context())
+				if !hasUsers {
+					http.Redirect(w, r, "/setup", http.StatusSeeOther)
+				} else {
+					http.Redirect(w, r, "/login", http.StatusSeeOther)
+				}
 			}
 			return
 		}
@@ -517,9 +686,10 @@ func (s *Server) loadPrincipal(r *http.Request) (principal, bool) {
 		return principal{}, false
 	}
 	var p principal
+	var name sql.NullString
 	var csrfSecret []byte
 	var expires, revoked, lastSeen sql.NullInt64
-	err := s.db.QueryRowContext(r.Context(), `SELECT u.id,u.username,s.csrf_secret,s.expires_at,s.revoked_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.disabled_at IS NULL`, hash).Scan(&p.UserID, &p.Username, &csrfSecret, &expires, &revoked, &lastSeen)
+	err := s.db.QueryRowContext(r.Context(), `SELECT u.id,u.username,COALESCE(u.name, ''),s.csrf_secret,s.expires_at,s.revoked_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.disabled_at IS NULL`, hash).Scan(&p.UserID, &p.Username, &name, &csrfSecret, &expires, &revoked, &lastSeen)
 	now := time.Now()
 	if err != nil || revoked.Valid || expires.Int64 < now.Unix() || lastSeen.Int64 < now.Add(-s.cfg.SessionIdleTimeout).Unix() {
 		return principal{}, false
@@ -527,6 +697,7 @@ func (s *Server) loadPrincipal(r *http.Request) (principal, bool) {
 	if lastSeen.Int64 < now.Add(-5*time.Minute).Unix() {
 		_, _ = s.db.ExecContext(r.Context(), `UPDATE sessions SET last_seen_at=? WHERE token_hash=?`, now.Unix(), hash)
 	}
+	p.Name = name.String
 	p.CSRF = auth.CSRF(csrfSecret)
 	return p, true
 }
@@ -555,7 +726,7 @@ func (s *Server) render(w http.ResponseWriter, name string, data any) {
 		slog.Error("template error", "error", err)
 	}
 }
-func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, message string, status int) {
+func (s *Server) ensureLoginCSRFCookie(w http.ResponseWriter, r *http.Request) string {
 	var raw string
 	if c, err := r.Cookie("alphadrive_login_csrf"); err == nil && c.Value != "" {
 		if _, _, err := auth.TokenFromRaw(c.Value); err == nil {
@@ -565,20 +736,22 @@ func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, message str
 	if raw == "" {
 		var err error
 		raw, _, err = auth.Token()
-		if err != nil {
-			http.Error(w, "Something went wrong.", 500)
-			return
+		if err == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "alphadrive_login_csrf",
+				Value:    raw,
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   s.cfg.SecureCookies,
+				SameSite: http.SameSiteLaxMode,
+				MaxAge:   600,
+			})
 		}
-		http.SetCookie(w, &http.Cookie{
-			Name:     "alphadrive_login_csrf",
-			Value:    raw,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   s.cfg.SecureCookies,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   600,
-		})
 	}
+	return raw
+}
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, message string, status int) {
+	raw := s.ensureLoginCSRFCookie(w, r)
 	w.WriteHeader(status)
 	s.render(w, "login.html", map[string]string{"CSRF": raw, "Error": message})
 }
@@ -729,23 +902,10 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 		expiryStr = input.ExpiresIn
 	}
 
-	var expiresAt *time.Time
-	if expiryStr != "" {
-		var d time.Duration
-		switch expiryStr {
-		case "1h":
-			d = 1 * time.Hour
-		case "24h":
-			d = 24 * time.Hour
-		case "7d":
-			d = 7 * 24 * time.Hour
-		case "30d":
-			d = 30 * 24 * time.Hour
-		}
-		if d > 0 {
-			t := time.Now().Add(d).UTC()
-			expiresAt = &t
-		}
+	expiresAt, err := shares.ParseExpiry(expiryStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid_expiry", err.Error())
+		return
 	}
 
 	sh, err := s.shares.Create(r.Context(), p.UserID, input.NodeID, slug, input.Password, expiresAt)
@@ -757,11 +917,19 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, "invalid_slug", err.Error())
 		return
 	}
+	if errors.Is(err, shares.ErrInvalidExpiry) {
+		apiError(w, http.StatusBadRequest, "invalid_expiry", err.Error())
+		return
+	}
 	if errors.Is(err, files.ErrNotFound) {
 		apiError(w, http.StatusNotFound, "not_found", "Item not found.")
 		return
 	}
 	if err != nil {
+		if strings.Contains(err.Error(), "password") {
+			apiError(w, http.StatusBadRequest, "invalid_password", err.Error())
+			return
+		}
 		internalError(w, r, err)
 		return
 	}
@@ -837,27 +1005,28 @@ func (s *Server) shareCookieName(slug string) string {
 	return "alphadrive_share_" + slug
 }
 
-func (s *Server) signShareToken(shareID string) string {
-	h := sha256.New()
-	h.Write([]byte("alphadrive_share_grant_secret:" + shareID))
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 func (s *Server) hasShareAccess(r *http.Request, sh *shares.Share) bool {
 	if !sh.HasPassword {
 		return true
 	}
 	c, err := r.Cookie(s.shareCookieName(sh.Slug))
+	if err != nil || strings.TrimSpace(c.Value) == "" {
+		return false
+	}
+	ok, err := s.shares.VerifyGrant(r.Context(), sh.ID, c.Value)
 	if err != nil {
 		return false
 	}
-	expected := s.signShareToken(sh.ID)
-	return subtle.ConstantTimeCompare([]byte(c.Value), []byte(expected)) == 1
+	return ok
 }
 
-func (s *Server) grantShareAccess(w http.ResponseWriter, r *http.Request, sh *shares.Share) {
-	token := s.signShareToken(sh.ID)
-	maxAge := 86400
+func (s *Server) grantShareAccess(w http.ResponseWriter, r *http.Request, sh *shares.Share) error {
+	ttl := 24 * time.Hour
+	rawToken, err := s.shares.CreateGrant(r.Context(), sh.ID, ttl, sh.ExpiresAt)
+	if err != nil {
+		return err
+	}
+	maxAge := int(ttl.Seconds())
 	if sh.ExpiresAt != nil {
 		rem := int(time.Until(*sh.ExpiresAt).Seconds())
 		if rem < maxAge && rem > 0 {
@@ -866,13 +1035,14 @@ func (s *Server) grantShareAccess(w http.ResponseWriter, r *http.Request, sh *sh
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.shareCookieName(sh.Slug),
-		Value:    token,
+		Value:    rawToken,
 		Path:     "/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   s.cfg.SecureCookies,
 		SameSite: http.SameSiteLaxMode,
 	})
+	return nil
 }
 
 type publicData struct {
@@ -996,7 +1166,14 @@ func (s *Server) unlockShare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.shareAttempts.Success(clientIP(r))
-	s.grantShareAccess(w, r, sh)
+	if err := s.grantShareAccess(w, r, sh); err != nil {
+		internalError(w, r, err)
+		return
+	}
+	if strings.Contains(r.Header.Get("Accept"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		jsonResponse(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
 	http.Redirect(w, r, "/s/"+slug, http.StatusSeeOther)
 }
 

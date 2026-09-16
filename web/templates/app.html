@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="icon" type="image/png" href="/static/images/logo.png">
 </head>
 <body class="drive-page">
     <!-- Desktop Header -->
@@ -230,8 +231,8 @@
                     <input id="share-custom-slug" type="text" placeholder="e.g. project-docs" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
                 </div>
                 <div class="form-group">
-                    <label for="share-new-password" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Protect with password (optional)</label>
-                    <input id="share-new-password" type="password" placeholder="Leave empty for public access" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
+                    <label for="share-new-password" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Protect with password (optional, min 12 chars)</label>
+                    <input id="share-new-password" type="password" minlength="12" placeholder="Leave empty for public or min 12 chars" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
                 </div>
                 <div class="form-group">
                     <label for="share-new-expiry" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Expires after (optional)</label>

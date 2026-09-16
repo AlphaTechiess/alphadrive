@@ -12,10 +12,11 @@ import (
 	"github.com/AlphaTechiess/alphadrive/internal/config"
 )
 
+// Injected at build time via -ldflags "-X main.Version=... -X main.BuildDate=... -X main.Commit=..."
 var (
-	Version   = "1.0.0"
-	BuildDate = "2026-09-16"
-	Commit    = "release"
+	Version   = "dev"
+	BuildDate = "unknown"
+	Commit    = "none"
 )
 
 func main() {
@@ -31,6 +32,8 @@ func main() {
 		createUser(os.Args[2:])
 	case "reset-password":
 		resetPassword(os.Args[2:])
+	case "backup":
+		runBackup(os.Args[2:])
 	case "doctor":
 		runDoctor(os.Args[2:])
 	case "version", "-v", "--version":
@@ -42,7 +45,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Printf("AlphaDrive v%s (%s, commit: %s, %s/%s)\n", Version, BuildDate, Commit, runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("AlphaDrive v%s (built: %s, commit: %s, %s/%s)\n", Version, BuildDate, Commit, runtime.GOOS, runtime.GOARCH)
 }
 
 func serve(args []string) {
@@ -64,6 +67,7 @@ func serve(args []string) {
 func createUser(args []string) {
 	fs := flag.NewFlagSet("create-user", flag.ExitOnError)
 	configPath := fs.String("config", "", "path to JSON configuration")
+	name := fs.String("name", "", "full name (optional)")
 	username := fs.String("username", "", "username")
 	password := fs.String("password", "", "password (prefer ALPHADRIVE_PASSWORD)")
 	admin := fs.Bool("admin", true, "create an administrator")
@@ -77,6 +81,9 @@ func createUser(args []string) {
 	if *password == "" {
 		fatal(fmt.Errorf("provide --password or ALPHADRIVE_PASSWORD"))
 	}
+	if len(*password) < 12 {
+		fatal(fmt.Errorf("password must be at least 12 characters"))
+	}
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		fatal(err)
@@ -86,7 +93,7 @@ func createUser(args []string) {
 		fatal(err)
 	}
 	defer a.Close()
-	if err := a.CreateUser(context.Background(), *username, *password, *admin); err != nil {
+	if err := a.CreateUserWithName(context.Background(), *name, *username, *password, *admin); err != nil {
 		fatal(err)
 	}
 	slog.Info("user created successfully", "username", *username, "admin", *admin)
@@ -107,6 +114,9 @@ func resetPassword(args []string) {
 	if *password == "" {
 		fatal(fmt.Errorf("provide --password or ALPHADRIVE_PASSWORD"))
 	}
+	if len(*password) < 12 {
+		fatal(fmt.Errorf("password must be at least 12 characters"))
+	}
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		fatal(err)
@@ -120,6 +130,26 @@ func resetPassword(args []string) {
 		fatal(err)
 	}
 	slog.Info("password reset successfully", "username", *username)
+}
+
+func runBackup(args []string) {
+	fs := flag.NewFlagSet("backup", flag.ExitOnError)
+	configPath := fs.String("config", "", "path to JSON configuration")
+	output := fs.String("output", "", "output backup archive path (.tar.gz)")
+	_ = fs.Parse(args)
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fatal(err)
+	}
+	a, err := app.New(cfg)
+	if err != nil {
+		fatal(err)
+	}
+	defer a.Close()
+	if err := a.Backup(context.Background(), *output); err != nil {
+		fatal(fmt.Errorf("backup failed: %w", err))
+	}
+	slog.Info("backup completed successfully", "output", *output)
 }
 
 func runDoctor(args []string) {
@@ -145,10 +175,11 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: alphadrive <command> [options]")
 	fmt.Fprintln(os.Stderr, "\nCommands:")
 	fmt.Fprintln(os.Stderr, "  serve            Start the AlphaDrive HTTP server")
-	fmt.Fprintln(os.Stderr, "  create-user      Create a new user account")
-	fmt.Fprintln(os.Stderr, "  reset-password   Reset password for an existing user")
+	fmt.Fprintln(os.Stderr, "  create-user      Create a new user account (min 12 chars)")
+	fmt.Fprintln(os.Stderr, "  reset-password   Reset password for an existing user (min 12 chars)")
+	fmt.Fprintln(os.Stderr, "  backup           Generate hot, consistent backup of database and storage")
 	fmt.Fprintln(os.Stderr, "  doctor           Run system integrity and diagnostics checks")
-	fmt.Fprintln(os.Stderr, "  version          Print AlphaDrive version information")
+	fmt.Fprintln(os.Stderr, "  version          Print AlphaDrive version and build information")
 }
 
 func fatal(err error) {

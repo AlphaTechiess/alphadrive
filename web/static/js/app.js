@@ -94,32 +94,48 @@ async function updateStorageQuota() {
     try {
         const me = await api('/api/me');
         if (me) {
-            const serverTotal = me.server_total || me.quota_bytes || 0;
-            const serverUsed = me.server_used || me.used_bytes || 0;
-            const serverFree = me.server_free !== undefined ? me.server_free : (serverTotal > serverUsed ? serverTotal - serverUsed : 0);
-            const appUsed = me.alphadrive_used !== undefined ? me.alphadrive_used : (me.used_bytes || 0);
+            const detectionAvailable = me.storage_detection_available !== false && me.filesystem_total_bytes !== null && me.filesystem_total_bytes !== undefined;
+            const appUsed = me.alphadrive_used_bytes !== undefined ? me.alphadrive_used_bytes : (me.used_bytes || 0);
 
-            const pct = serverTotal > 0 ? Math.min(100, Math.round((serverUsed / serverTotal) * 100)) : 0;
-            if (storageText) {
-                storageText.textContent = `${pct}% of ${formatBytes(serverTotal)} Used`;
-            }
-            if (storageBar) {
-                storageBar.style.width = `${pct}%`;
-            }
-
-            // Update Storage Overview Modal
             const modalTotal = document.querySelector('#storage-modal-total');
             const modalUsed = document.querySelector('#storage-modal-used');
             const modalFree = document.querySelector('#storage-modal-free');
             const modalApp = document.querySelector('#storage-modal-app');
 
-            if (modalTotal) modalTotal.textContent = formatBytes(serverTotal);
-            if (modalUsed) modalUsed.textContent = formatBytes(serverUsed);
-            if (modalFree) modalFree.textContent = formatBytes(serverFree);
+            if (detectionAvailable) {
+                const fsTotal = me.filesystem_total_bytes || me.server_total || 0;
+                const fsUsed = me.filesystem_used_bytes || me.server_used || 0;
+                const fsFree = me.filesystem_free_bytes !== undefined && me.filesystem_free_bytes !== null ? me.filesystem_free_bytes : (fsTotal > fsUsed ? fsTotal - fsUsed : 0);
+
+                const pct = fsTotal > 0 ? Math.min(100, Math.round((fsUsed / fsTotal) * 100)) : 0;
+                if (storageText) {
+                    storageText.textContent = `${pct}% of ${formatBytes(fsTotal)} Used`;
+                }
+                if (storageBar) {
+                    storageBar.style.width = `${pct}%`;
+                }
+
+                if (modalTotal) modalTotal.textContent = formatBytes(fsTotal);
+                if (modalUsed) modalUsed.textContent = formatBytes(fsUsed);
+                if (modalFree) modalFree.textContent = formatBytes(fsFree);
+            } else {
+                if (storageText) {
+                    storageText.textContent = 'Storage information unavailable';
+                }
+                if (storageBar) {
+                    storageBar.style.width = '0%';
+                }
+
+                if (modalTotal) modalTotal.textContent = 'Unavailable';
+                if (modalUsed) modalUsed.textContent = 'Unavailable';
+                if (modalFree) modalFree.textContent = 'Unavailable';
+            }
+
             if (modalApp) modalApp.textContent = formatBytes(appUsed);
         }
     } catch (e) {
         console.warn('Could not update storage quota', e);
+        if (storageText) storageText.textContent = 'Storage information unavailable';
     }
 }
 
@@ -615,6 +631,11 @@ shareCreateForm?.addEventListener('submit', async event => {
     const customSlug = shareCustomSlugInput?.value?.trim() || undefined;
     const password = shareNewPasswordInput?.value || undefined;
     const expiresIn = shareNewExpirySelect?.value || undefined;
+
+    if (password && password.length < 12) {
+        showNotice('Share password must be at least 12 characters', true);
+        return;
+    }
 
     try {
         const result = await api('/api/shares', {

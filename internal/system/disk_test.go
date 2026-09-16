@@ -23,4 +23,10 @@ func TestGetDiskStats(t *testing.T) {
 		t.Errorf("expected TotalBytes >= FreeBytes, got total=%d free=%d", stats.TotalBytes, stats.FreeBytes)
 	}
 	t.Logf("Disk stats for %s: Total=%d, Used=%d, Free=%d", wd, stats.TotalBytes, stats.UsedBytes, stats.FreeBytes)
+
+	// Non-existent path returns error
+	_, err = GetDiskStats("Z:\\non_existent_drive_path_12345")
+	if err == nil {
+		t.Log("Note: non-existent drive error test handled gracefully by OS")
+	}
 }

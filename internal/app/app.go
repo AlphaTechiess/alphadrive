@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/AlphaTechiess/alphadrive/internal/auth"
+	"github.com/AlphaTechiess/alphadrive/internal/backup"
 	"github.com/AlphaTechiess/alphadrive/internal/config"
 	"github.com/AlphaTechiess/alphadrive/internal/database"
 	"github.com/AlphaTechiess/alphadrive/internal/doctor"
@@ -49,16 +50,23 @@ func (a *App) Close() error {
 }
 
 func (a *App) CreateUser(ctx context.Context, username, password string, admin bool) error {
+	return a.CreateUserWithName(ctx, "", username, password, admin)
+}
+
+func (a *App) CreateUserWithName(ctx context.Context, name, username, password string, admin bool) error {
+	if len(password) < 12 {
+		return fmt.Errorf("password must be at least 12 characters")
+	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return err
 	}
-	return a.server.CreateUser(ctx, username, hash, admin)
+	return a.server.CreateUserWithName(ctx, name, username, hash, admin)
 }
 
 func (a *App) ResetPassword(ctx context.Context, username, password string) error {
-	if len(password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+	if len(password) < 12 {
+		return fmt.Errorf("password must be at least 12 characters")
 	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {
@@ -86,6 +94,10 @@ func (a *App) Doctor(ctx context.Context) error {
 		return fmt.Errorf("diagnostics reported failures")
 	}
 	return nil
+}
+
+func (a *App) Backup(ctx context.Context, outputPath string) error {
+	return backup.Create(ctx, a.db.DB, a.cfg.DataDir, outputPath)
 }
 
 func (a *App) Serve(ctx context.Context) error {

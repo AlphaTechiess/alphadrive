@@ -77,8 +77,8 @@ func Run(ctx context.Context, cfg config.Config, db *sql.DB, w io.Writer) bool {
 	var maxMigration sql.NullInt64
 	if err := db.QueryRowContext(ctx, "SELECT max(version) FROM schema_migrations").Scan(&maxMigration); err != nil {
 		record("Schema Migrations", "FAIL", fmt.Sprintf("Failed to query schema_migrations: %v", err))
-	} else if !maxMigration.Valid || maxMigration.Int64 < 2 {
-		record("Schema Migrations", "WARN", fmt.Sprintf("Current migration version is %d (expected 2)", maxMigration.Int64))
+	} else if !maxMigration.Valid || maxMigration.Int64 < 3 {
+		record("Schema Migrations", "WARN", fmt.Sprintf("Current migration version is %d (expected 3)", maxMigration.Int64))
 	} else {
 		record("Schema Migrations", "OK", fmt.Sprintf("Schema is up to date (version %d)", maxMigration.Int64))
 	}

@@ -22,7 +22,14 @@ func Open(dataDir string) (*DB, error) {
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	for _, statement := range []string{"PRAGMA foreign_keys = ON", "PRAGMA journal_mode = WAL", "PRAGMA busy_timeout = 5000"} {
+	for _, statement := range []string{
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA synchronous = NORMAL",
+		"PRAGMA temp_store = MEMORY",
+		"PRAGMA cache_size = -2000",
+	} {
 		if _, err := db.Exec(statement); err != nil {
 			db.Close()
 			return nil, err
@@ -104,6 +111,28 @@ var migrations = []migration{
 			`CREATE INDEX IF NOT EXISTS shares_lookup ON shares(slug, revoked_at, expires_at)`,
 			`CREATE INDEX IF NOT EXISTS shares_node ON shares(node_id, revoked_at)`,
 			`CREATE INDEX IF NOT EXISTS shares_user ON shares(user_id, revoked_at)`,
+		},
+	},
+	{
+		version: 3,
+		name:    "share_grants",
+		queries: []string{
+			`CREATE TABLE IF NOT EXISTS share_grants (
+				id TEXT PRIMARY KEY,
+				share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,
+				token_hash BLOB NOT NULL UNIQUE,
+				created_at INTEGER NOT NULL,
+				expires_at INTEGER NOT NULL
+			)`,
+			`CREATE INDEX IF NOT EXISTS share_grants_lookup ON share_grants(token_hash, expires_at)`,
+			`CREATE INDEX IF NOT EXISTS share_grants_share ON share_grants(share_id)`,
+		},
+	},
+	{
+		version: 4,
+		name:    "add_name_to_users",
+		queries: []string{
+			`ALTER TABLE users ADD COLUMN name TEXT NOT NULL DEFAULT ''`,
 		},
 	},
 }

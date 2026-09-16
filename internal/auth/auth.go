@@ -19,15 +19,15 @@ const (
 )
 
 func HashPassword(password string) (string, error) {
-	if len(password) < 8 {
-		return "", fmt.Errorf("password must be at least 8 characters")
+	if len(password) < 12 {
+		return "", fmt.Errorf("password must be at least 12 characters")
 	}
 	return hashArgon2id(password)
 }
 
 func HashSharePassword(password string) (string, error) {
-	if len(strings.TrimSpace(password)) < 1 {
-		return "", fmt.Errorf("password cannot be empty")
+	if len(strings.TrimSpace(password)) < 12 {
+		return "", fmt.Errorf("share password must be at least 12 characters")
 	}
 	return hashArgon2id(password)
 }

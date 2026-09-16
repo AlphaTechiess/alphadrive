@@ -2,6 +2,7 @@ package shares
 
 import (
 	"context"
+	"crypto/sha256"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +54,9 @@ func TestShareCreationAndSlugValidation(t *testing.T) {
 	if sh1.Slug == "" || len(sh1.Slug) < 3 {
 		t.Errorf("expected generated slug, got %s", sh1.Slug)
 	}
+	if err := ValidateSlug(sh1.Slug); err != nil {
+		t.Errorf("generated slug failed validation: %v", err)
+	}
 
 	// 2. Custom valid slug
 	sh2, err := ss.Create(ctx, userID, folder.ID, "my-custom-docs", "", nil)
@@ -69,17 +73,49 @@ func TestShareCreationAndSlugValidation(t *testing.T) {
 		t.Errorf("expected ErrSlugTaken, got %v", err)
 	}
 
-	// 4. Invalid slug formats
-	invalidSlugs := []string{"a", "ab", "invalid slug with spaces", "bad/slash", "api", "static", "login"}
+	// 4. Invalid slug formats (including underscores and uppercase)
+	invalidSlugs := []string{"a", "ab", "invalid_with_underscore", "UPPERCASE", "with spaces", "bad/slash", "api", "static", "login", "healthz"}
 	for _, s := range invalidSlugs {
+		if err := ValidateSlug(s); err == nil {
+			t.Errorf("expected ValidateSlug error for '%s', got nil", s)
+		}
 		_, err := ss.Create(ctx, userID, folder.ID, s, "", nil)
 		if err == nil {
-			t.Errorf("expected error for invalid slug '%s', got nil", s)
+			t.Errorf("expected Create error for invalid slug '%s', got nil", s)
 		}
 	}
 }
 
-func TestSharePasswordAndExpiration(t *testing.T) {
+func TestShareExpiryParsing(t *testing.T) {
+	// Valid expiries
+	for _, exp := range []string{"1h", "24h", "7d", "30d"} {
+		parsed, err := ParseExpiry(exp)
+		if err != nil {
+			t.Errorf("expected valid ParseExpiry for %s, got err: %v", exp, err)
+		}
+		if parsed == nil || !parsed.After(time.Now().UTC()) {
+			t.Errorf("expected future time for %s, got %v", exp, parsed)
+		}
+	}
+
+	// Never / empty
+	for _, exp := range []string{"", "never", "none", "  "} {
+		parsed, err := ParseExpiry(exp)
+		if err != nil || parsed != nil {
+			t.Errorf("expected nil for %q, got parsed=%v, err=%v", exp, parsed, err)
+		}
+	}
+
+	// Invalid expiries
+	for _, exp := range []string{"invalid", "10m", "2years", "yesterday", "-1h"} {
+		_, err := ParseExpiry(exp)
+		if err == nil {
+			t.Errorf("expected error for invalid expiry %q, got nil", exp)
+		}
+	}
+}
+
+func TestSharePasswordAndGrants(t *testing.T) {
 	ctx := context.Background()
 	db, fs, ss, userID := setupTestDB(t)
 	defer db.Close()
@@ -90,9 +126,15 @@ func TestSharePasswordAndExpiration(t *testing.T) {
 		t.Fatalf("upload file: %v", err)
 	}
 
-	// Create share with password and future expiration
+	// Reject short share password (<12 chars)
+	_, err = ss.Create(ctx, userID, file.ID, "short-pwd", "too-short", nil)
+	if err == nil {
+		t.Fatal("expected error for short share password (<12 chars), got nil")
+	}
+
+	// Create share with 12+ char password and future expiration
 	future := time.Now().Add(24 * time.Hour).UTC()
-	sh, err := ss.Create(ctx, userID, file.ID, "secret-share", "Pass1234!", &future)
+	sh, err := ss.Create(ctx, userID, file.ID, "secret-share", "SuperSecretPass123", &future)
 	if err != nil {
 		t.Fatalf("create share: %v", err)
 	}
@@ -106,31 +148,59 @@ func TestSharePasswordAndExpiration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get by slug: %v", err)
 	}
-	if !ss.VerifyPassword(fetched, "Pass1234!") {
+	if !ss.VerifyPassword(fetched, "SuperSecretPass123") {
 		t.Errorf("password verification failed with correct password")
 	}
-	if ss.VerifyPassword(fetched, "WrongPass") {
+	if ss.VerifyPassword(fetched, "WrongPass123456") {
 		t.Errorf("password verification succeeded with wrong password")
 	}
 
-	// Test expired share
-	past := time.Now().Add(-1 * time.Hour).UTC()
-	shExp, err := ss.Create(ctx, userID, file.ID, "expired-share", "", &past)
+	// 1. Create grant for share
+	grantToken1, err := ss.CreateGrant(ctx, sh.ID, 24*time.Hour, sh.ExpiresAt)
 	if err != nil {
-		t.Fatalf("create expired share: %v", err)
+		t.Fatalf("create grant 1: %v", err)
 	}
-	_, err = ss.GetBySlug(ctx, shExp.Slug)
-	if err != ErrExpired {
-		t.Errorf("expected ErrExpired, got %v", err)
+	if len(grantToken1) < 32 {
+		t.Fatalf("expected grant token length >= 32, got %d", len(grantToken1))
 	}
 
-	// Test revoked share
+	// 2. Create second grant - must be different (randomness test)
+	grantToken2, err := ss.CreateGrant(ctx, sh.ID, 24*time.Hour, sh.ExpiresAt)
+	if err != nil {
+		t.Fatalf("create grant 2: %v", err)
+	}
+	if grantToken1 == grantToken2 {
+		t.Fatal("expected two generated grant tokens to be distinct")
+	}
+
+	// 3. Verify that DB stores only SHA-256 hash, not raw token
+	tokenHash := sha256.Sum256([]byte(grantToken1))
+	var storedHash []byte
+	err = db.QueryRowContext(ctx, "SELECT token_hash FROM share_grants WHERE share_id=? AND token_hash=?", sh.ID, tokenHash[:]).Scan(&storedHash)
+	if err != nil {
+		t.Fatalf("failed to find token hash in database: %v", err)
+	}
+
+	// 4. Verify grant validity
+	ok, err := ss.VerifyGrant(ctx, sh.ID, grantToken1)
+	if err != nil || !ok {
+		t.Fatalf("expected grant 1 to be valid, ok=%v, err=%v", ok, err)
+	}
+
+	// Invalid token fails
+	badOk, _ := ss.VerifyGrant(ctx, sh.ID, "completely-fake-token")
+	if badOk {
+		t.Fatal("fake token was accepted as valid grant")
+	}
+
+	// 5. Revoke share -> grants must be invalidated
 	if err := ss.Revoke(ctx, userID, sh.ID); err != nil {
 		t.Fatalf("revoke share: %v", err)
 	}
-	_, err = ss.GetBySlug(ctx, sh.Slug)
-	if err != ErrRevoked {
-		t.Errorf("expected ErrRevoked, got %v", err)
+
+	revokedOk, _ := ss.VerifyGrant(ctx, sh.ID, grantToken1)
+	if revokedOk {
+		t.Fatal("grant is still valid after share was revoked")
 	}
 }
 

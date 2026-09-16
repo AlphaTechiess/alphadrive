@@ -23,7 +23,7 @@ EnvironmentFile=-/etc/alphadrive/alphadrive.env
 
 # Sandboxing and security hardening
 NoNewPrivileges=true
-ProtectSystem=full
+ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true
@@ -33,6 +33,9 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictRealtime=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
+
+# Explicit writable storage path for strict sandbox mode
+ReadWritePaths=/var/lib/alphadrive/data
 
 # Logging
 StandardOutput=journal

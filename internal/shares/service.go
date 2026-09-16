@@ -3,8 +3,10 @@ package shares
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -25,6 +27,7 @@ var (
 	ErrPasswordNeeded = errors.New("password required to access share")
 	ErrWrongPassword  = errors.New("incorrect share password")
 	ErrAccessDenied   = errors.New("access denied to requested item")
+	ErrInvalidExpiry  = errors.New("invalid expiration format")
 )
 
 var reservedSlugs = map[string]bool{
@@ -77,26 +80,43 @@ func ValidateSlug(slug string) error {
 	if reservedSlugs[strings.ToLower(slug)] {
 		return fmt.Errorf("%w: '%s' is a reserved keyword", ErrInvalidSlug, slug)
 	}
+	// Strictly lowercase letters, digits, and hyphens only (no uppercase, no underscores)
 	for _, r := range slug {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
-			return fmt.Errorf("%w: only letters, numbers, hyphens and underscores allowed", ErrInvalidSlug)
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return fmt.Errorf("%w: only lowercase letters, numbers, and hyphens allowed (no uppercase or underscores)", ErrInvalidSlug)
 		}
 	}
 	return nil
 }
 
 func GenerateSlug() (string, error) {
-	b := make([]byte, 8)
+	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	slug := base64.RawURLEncoding.EncodeToString(b)
-	slug = strings.ReplaceAll(slug, "-", "")
-	slug = strings.ReplaceAll(slug, "_", "")
-	if len(slug) > 10 {
-		slug = slug[:10]
+	return hex.EncodeToString(b), nil
+}
+
+func ParseExpiry(exp string) (*time.Time, error) {
+	exp = strings.TrimSpace(exp)
+	if exp == "" || strings.EqualFold(exp, "never") || strings.EqualFold(exp, "none") {
+		return nil, nil
 	}
-	return strings.ToLower(slug), nil
+	var d time.Duration
+	switch exp {
+	case "1h":
+		d = 1 * time.Hour
+	case "24h":
+		d = 24 * time.Hour
+	case "7d":
+		d = 7 * 24 * time.Hour
+	case "30d":
+		d = 30 * 24 * time.Hour
+	default:
+		return nil, fmt.Errorf("%w: unsupported duration %q (allowed: 1h, 24h, 7d, 30d, never)", ErrInvalidExpiry, exp)
+	}
+	t := time.Now().UTC().Add(d)
+	return &t, nil
 }
 
 func (s *Service) Create(ctx context.Context, userID, nodeID, customSlug, password string, expiresAt *time.Time) (*Share, error) {
@@ -152,9 +172,13 @@ func (s *Service) Create(ctx context.Context, userID, nodeID, customSlug, passwo
 	if strings.TrimSpace(password) != "" {
 		h, err := auth.HashSharePassword(password)
 		if err != nil {
-			return nil, fmt.Errorf("hash password: %w", err)
+			return nil, err
 		}
 		pwdHash = &h
+	}
+
+	if expiresAt != nil && !expiresAt.After(time.Now().UTC()) {
+		return nil, fmt.Errorf("%w: expiration date must be in the future", ErrInvalidExpiry)
 	}
 
 	b := make([]byte, 16)
@@ -355,6 +379,8 @@ func (s *Service) Revoke(ctx context.Context, userID, shareID string) error {
 	if n == 0 {
 		return ErrNotFound
 	}
+	// Invalidate all active grants for this share immediately
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM share_grants WHERE share_id=?`, shareID)
 	return nil
 }
 
@@ -368,6 +394,49 @@ func (s *Service) VerifyPassword(sh *Share, password string) bool {
 		return true
 	}
 	return auth.VerifyPassword(*sh.PasswordHash, password)
+}
+
+// CreateGrant generates a cryptographically random 32-byte grant token and stores its SHA-256 hash server-side
+func (s *Service) CreateGrant(ctx context.Context, shareID string, ttl time.Duration, shareExpiresAt *time.Time) (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	rawToken := base64.RawURLEncoding.EncodeToString(b)
+	hash := sha256.Sum256([]byte(rawToken))
+
+	now := time.Now().UTC()
+	exp := now.Add(ttl)
+	if shareExpiresAt != nil && shareExpiresAt.Before(exp) {
+		exp = *shareExpiresAt
+	}
+
+	grantID := "grant_" + base64.RawURLEncoding.EncodeToString(b[:12])
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO share_grants(id, share_id, token_hash, created_at, expires_at)
+		VALUES(?, ?, ?, ?, ?)
+	`, grantID, shareID, hash[:], now.Unix(), exp.Unix())
+	if err != nil {
+		return "", err
+	}
+	return rawToken, nil
+}
+
+// VerifyGrant checks if rawToken is valid and unexpired for shareID
+func (s *Service) VerifyGrant(ctx context.Context, shareID, rawToken string) (bool, error) {
+	if strings.TrimSpace(rawToken) == "" || strings.TrimSpace(shareID) == "" {
+		return false, nil
+	}
+	hash := sha256.Sum256([]byte(rawToken))
+	var count int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT count(*) FROM share_grants
+		WHERE share_id=? AND token_hash=? AND expires_at > unixepoch()
+	`, shareID, hash[:]).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // VerifyDescendant ensures childNodeID is rootNodeID or a descendant of rootNodeID within the user's active tree

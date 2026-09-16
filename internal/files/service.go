@@ -417,8 +417,17 @@ func (s *Service) DeletePermanently(ctx context.Context, userID string, nodeIDs 
 			}
 		}
 
-		for _, it := range items {
-			_, _ = s.db.ExecContext(ctx, `DELETE FROM nodes WHERE id=? AND user_id=?`, it.id, userID)
+		if len(items) > 0 {
+			tx, err := s.db.BeginTx(ctx, nil)
+			if err != nil {
+				return err
+			}
+			for _, it := range items {
+				_, _ = tx.ExecContext(ctx, `DELETE FROM nodes WHERE id=? AND user_id=?`, it.id, userID)
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

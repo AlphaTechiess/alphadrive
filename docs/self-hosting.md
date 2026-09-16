@@ -119,6 +119,12 @@ Run non-destructive SQLite integrity checks, verify physical object consistency,
 sudo -u alphadrive ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data /usr/local/bin/alphadrive doctor
 ```
 
+### Hot Atomic Backup (`backup`)
+Generate a complete, consistent backup of SQLite database and physical storage:
+```bash
+sudo -u alphadrive ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data /usr/local/bin/alphadrive backup --output /var/backups/alphadrive-$(date +%Y%m%d).tar.gz
+```
+
 ### Password Reset
 Reset password for any user and invalidate active sessions:
 ```bash

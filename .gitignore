@@ -19,15 +19,15 @@ coverage.*
 profile.cov
 
 # Application runtime and user storage data
-data/
+/data/
 *.db
 *.db-*
 *.db-wal
 *.db-shm
 
 # Backups and archives
-backups/
-backup/
+/backups/
+/backup/
 *.tar.gz
 *.zip
 

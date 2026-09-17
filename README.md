@@ -110,13 +110,21 @@ alphadrive version
 
 ---
 
-## Documentation
+## Documentation & Guides
 
-Detailed operations and deployment guides are available in the [`docs/`](./docs) directory:
+Comprehensive guides and operational runbooks are maintained on the **[AlphaDrive GitHub Wiki](https://github.com/AlphaTechiess/alphadrive/wiki)**:
 
-- [**Self-Hosting & VPS Deployment Guide**](./docs/self-hosting.md): Systemd setup, Caddy/Nginx reverse proxy, and environment configuration.
-- [**Backup & Disaster Recovery Guide**](./docs/backup-restore.md): Native hot backups, retention scripts, and restoration runbook.
-- [**Upgrades & Migration Guide**](./docs/upgrades.md): Safe binary upgrades and automated database migrations.
+- [**Self-Hosting & VPS Deployment Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Self-hosting): Complete setup with Systemd, Caddy, Nginx + SSL, and zero-downtime configuration.
+- [**Backup & Disaster Recovery Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Backup-&-Disaster-Recovery-Guide): Native atomic hot backups, cron retention schedules, and restoration instructions.
+- [**Upgrade & Maintenance Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Upgrade-&-Maintenance-Guide): Safe single-binary upgrades, automated SQLite migrations, and health diagnostics.
+
+---
+
+## Support & Donate
+
+If you love using AlphaDrive and want to support ongoing development and maintenance, you can donate here:
+
+<form><script src="https://checkout.razorpay.com/v1/payment-button.js" data-payment_button_id="pl_TczFT9fT8gqTdN" async></script></form>
 
 ---
 

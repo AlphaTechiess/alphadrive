@@ -15,10 +15,17 @@ AlphaDrive is designed for frictionless self-hosting on any standard Linux VPS (
 
 ## 2. Quick Installation Steps
 
-### Step 1: Install Binary & Directories
+### Step 1: Clone Repository & Build Binary
 
 ```bash
-# Copy binary to system path
+# Clone official repository
+git clone https://github.com/AlphaTechiess/alphadrive.git
+cd alphadrive
+
+# Build optimized binary
+go build -ldflags "-s -w" -o alphadrive ./cmd/alphadrive
+
+# Install binary to system path
 sudo install -m 755 alphadrive /usr/local/bin/alphadrive
 
 # Create dedicated unprivileged system user and group
@@ -43,9 +50,9 @@ ALPHADRIVE_PUBLIC_BASE_URL=https://drive.yourdomain.com
 # Storage path
 ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data
 
-# Quota and upload limits (optional, defaults to 1GB upload, 10GB storage)
-ALPHADRIVE_MAX_UPLOAD_BYTES=5368709120
-ALPHADRIVE_STORAGE_QUOTA_BYTES=107374182400
+# Upload and storage capacity (0 = Unlimited / bounded only by host VPS disk capacity)
+ALPHADRIVE_MAX_UPLOAD_BYTES=0
+ALPHADRIVE_STORAGE_QUOTA_BYTES=0
 
 # Set to true only during development over plain HTTP without HTTPS reverse proxy
 ALPHADRIVE_INSECURE_COOKIES=false

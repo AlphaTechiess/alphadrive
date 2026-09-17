@@ -16,12 +16,7 @@ drive.example.com {
     # Enable response compression for static web assets and text
     encode zstd gzip
 
-    # Configure maximum client request body size (e.g., 10GB for large uploads)
-    request_body {
-        max_size 10GB
-    }
-
-    # Reverse proxy all requests to AlphaDrive daemon
+    # Reverse proxy all requests to AlphaDrive daemon (unlimited body size by default)
     reverse_proxy 127.0.0.1:8080 {
         # Transparent proxy header forwarding
         header_up Host {host}

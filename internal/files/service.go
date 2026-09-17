@@ -199,7 +199,12 @@ func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id str
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
-	written, err := io.Copy(tmp, io.LimitReader(src, max+1))
+	var written int64
+	if max > 0 {
+		written, err = io.Copy(tmp, io.LimitReader(src, max+1))
+	} else {
+		written, err = io.Copy(tmp, src)
+	}
 	closeErr := tmp.Close()
 	if err != nil {
 		return Node{}, err
@@ -207,7 +212,7 @@ func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id str
 	if closeErr != nil {
 		return Node{}, closeErr
 	}
-	if written > max {
+	if max > 0 && written > max {
 		return Node{}, fmt.Errorf("upload exceeds configured size limit")
 	}
 	storageKey := id

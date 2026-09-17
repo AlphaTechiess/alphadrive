@@ -570,8 +570,10 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusTooManyRequests, "uploads_busy", "Too many uploads in progress.")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes+1024*1024)
-	if err := r.ParseMultipartForm(1024 * 1024); err != nil {
+	if s.cfg.MaxUploadBytes > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes+1024*1024)
+	}
+	if err := r.ParseMultipartForm(32 * 1024 * 1024); err != nil {
 		apiError(w, http.StatusBadRequest, "invalid_upload", "Unable to read upload.")
 		return
 	}

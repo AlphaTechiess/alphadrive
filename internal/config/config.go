@@ -26,9 +26,9 @@ func Default() Config {
 	return Config{
 		ListenAddress:       "127.0.0.1:8080",
 		DataDir:             "./data",
-		MaxUploadBytes:      1024 * 1024 * 1024,
-		MaxConcurrentUpload: 2,
-		StorageQuotaBytes:   10 * 1024 * 1024 * 1024,
+		MaxUploadBytes:      0, // 0 = unlimited (bounded only by host disk space)
+		MaxConcurrentUpload: 4,
+		StorageQuotaBytes:   0, // 0 = unlimited (bounded only by host disk space)
 		SessionIdleTimeout:  24 * time.Hour,
 		SessionMaxLifetime:  30 * 24 * time.Hour,
 		SecureCookies:       true,
@@ -47,7 +47,7 @@ func Load(path string) (Config, error) {
 		}
 	}
 	override(&c)
-	if c.DataDir == "" || c.MaxUploadBytes <= 0 || c.MaxConcurrentUpload <= 0 {
+	if c.DataDir == "" || c.MaxConcurrentUpload <= 0 || c.MaxUploadBytes < 0 || c.StorageQuotaBytes < 0 {
 		return c, fmt.Errorf("invalid configuration")
 	}
 	abs, err := filepath.Abs(c.DataDir)

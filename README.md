@@ -1,6 +1,11 @@
 # AlphaDrive
 
+[![GitHub Repository](https://img.shields.io/badge/GitHub-AlphaTechiess%2Falphadrive-blue?logo=github)](https://github.com/AlphaTechiess/alphadrive)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/AlphaTechiess/alphadrive/blob/main/LICENSE)
+
 A modern, fast, lightweight, and self-hosted cloud drive built specifically for Linux VPS servers and standalone deployments.
+
+**Repository**: [https://github.com/AlphaTechiess/alphadrive](https://github.com/AlphaTechiess/alphadrive)
 
 ---
 
@@ -12,6 +17,7 @@ AlphaDrive provides an elegant web interface and public sharing platform for per
 
 - **Single Compiled Binary**: Entire backend and web assets (HTML/CSS/JS/SVGs) are embedded directly into a single static executable.
 - **Minimal Footprint**: Written in pure Go with standard `net/http` and pure-Go SQLite (`modernc.org/sqlite`).
+- **Unlimited Storage & Uploads**: Zero artificial file size limits or storage caps. Your drive capacity is bounded purely by the physical storage available on your VPS disk.
 - **Instant Owner Onboarding**: Zero-CLI setup; first browser visit automatically presents the Owner Setup screen to create your administrator account.
 - **In-App Account & User Management**: Easily update your username, change password, or provision new team members straight from the header settings dialog.
 - **Physical Disk Telemetry**: Live VPS disk detection reporting real total, used, and free filesystem space.
@@ -48,8 +54,12 @@ AlphaDrive Daemon (127.0.0.1:8080)
 
 ## Quick Start (Linux VPS)
 
-### 1. Build and Run
+### 1. Clone, Build, and Run
 ```bash
+# Clone repository
+git clone https://github.com/AlphaTechiess/alphadrive.git
+cd alphadrive
+
 # Build binary
 go build -ldflags "-s -w" -o alphadrive ./cmd/alphadrive
 

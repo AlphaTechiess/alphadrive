@@ -222,14 +222,13 @@ func (s *Server) setupPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, errMsg, name, username string, status int) {
 	raw := s.ensureLoginCSRFCookie(w, r)
-	w.WriteHeader(status)
 	data := map[string]any{
 		"CSRF":     raw,
 		"Error":    errMsg,
 		"Name":     name,
 		"Username": username,
 	}
-	s.render(w, "setup.html", data)
+	s.renderHTML(w, status, "setup.html", data)
 }
 
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
@@ -897,11 +896,20 @@ func (s *Server) setSessionCookie(w http.ResponseWriter, raw string, expires tim
 func (s *Server) clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
-func (s *Server) render(w http.ResponseWriter, name string, data any) {
+func (s *Server) renderHTML(w http.ResponseWriter, status int, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.templates.ExecuteTemplate(w, name, data); err != nil {
-		slog.Error("template error", "error", err)
+	if status > 0 {
+		w.WriteHeader(status)
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
+	if err := s.templates.ExecuteTemplate(w, name, data); err != nil {
+		slog.Error("template error", "error", err, "template", name)
+	}
+}
+
+func (s *Server) render(w http.ResponseWriter, name string, data any) {
+	s.renderHTML(w, http.StatusOK, name, data)
 }
 func (s *Server) ensureLoginCSRFCookie(w http.ResponseWriter, r *http.Request) string {
 	var raw string
@@ -929,8 +937,7 @@ func (s *Server) ensureLoginCSRFCookie(w http.ResponseWriter, r *http.Request) s
 }
 func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, message string, status int) {
 	raw := s.ensureLoginCSRFCookie(w, r)
-	w.WriteHeader(status)
-	s.render(w, "login.html", map[string]string{"CSRF": raw, "Error": message})
+	s.renderHTML(w, status, "login.html", map[string]string{"CSRF": raw, "Error": message})
 }
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, message string, status int) {
 	s.renderLogin(w, r, message, status)
@@ -1266,8 +1273,7 @@ func (s *Server) renderPublic(w http.ResponseWriter, r *http.Request, state stri
 		}
 	}
 
-	w.WriteHeader(status)
-	_ = s.templates.ExecuteTemplate(w, "public.html", data)
+	s.renderHTML(w, status, "public.html", data)
 }
 
 func (s *Server) publicSharePage(w http.ResponseWriter, r *http.Request) {

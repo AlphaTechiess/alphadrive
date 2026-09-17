@@ -553,9 +553,13 @@ setup_system() {
         mkdir -p /var/backups
         local backup_file
         backup_file="/var/backups/alphadrive-preupgrade-$(date +%Y%m%d_%H%M%S).tar.gz"
-        if sudo -u alphadrive ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data /opt/alphadrive/alphadrive backup --output "${backup_file}" >/dev/null 2>&1; then
+        local backup_out
+        if backup_out="$(ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data /opt/alphadrive/alphadrive backup --output "${backup_file}" 2>&1)" && [ -s "${backup_file}" ]; then
+            chmod 600 "${backup_file}"
             success "Pre-upgrade backup created at: ${backup_file}"
         else
+            warn "Pre-upgrade backup command output:"
+            printf '%s\n' "$backup_out" >&2
             fatal "Pre-upgrade backup failed! Upgrade cancelled.\nExisting AlphaDrive installation has not been modified."
         fi
 

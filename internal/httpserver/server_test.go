@@ -1127,3 +1127,91 @@ func TestAccountSettingsAPI(t *testing.T) {
 		t.Fatalf("expected successful login for newly created thirduser")
 	}
 }
+
+func TestHTMLContentTypeRegression(t *testing.T) {
+	rig := setupTestRig(t)
+
+	// 1. Fresh instance: GET /setup must return Content-Type: text/html; charset=utf-8
+	resp, err := http.Get(rig.server.URL + "/setup")
+	if err != nil {
+		t.Fatalf("GET /setup failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET /setup, got %d", resp.StatusCode)
+	}
+	contentType := resp.Header.Get("Content-Type")
+	expectedCT := "text/html; charset=utf-8"
+	if contentType != expectedCT {
+		t.Fatalf("expected Content-Type %q for /setup, got %q", expectedCT, contentType)
+	}
+
+	// 2. POST /setup with error (400) must return Content-Type: text/html; charset=utf-8
+	resp400, err := http.PostForm(rig.server.URL+"/setup", url.Values{
+		"name": {""},
+	})
+	if err != nil {
+		t.Fatalf("POST /setup failed: %v", err)
+	}
+	defer resp400.Body.Close()
+	if resp400.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for bad POST /setup, got %d", resp400.StatusCode)
+	}
+	if ct := resp400.Header.Get("Content-Type"); ct != expectedCT {
+		t.Fatalf("expected Content-Type %q for 400 /setup, got %q", expectedCT, ct)
+	}
+
+	// Create user so login is accessible
+	rig.createUser(t, "testadmin", "ValidPassword123!")
+
+	// 3. GET /login must return Content-Type: text/html; charset=utf-8
+	loginResp, err := http.Get(rig.server.URL + "/login")
+	if err != nil {
+		t.Fatalf("GET /login failed: %v", err)
+	}
+	defer loginResp.Body.Close()
+	if loginResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET /login, got %d", loginResp.StatusCode)
+	}
+	if ct := loginResp.Header.Get("Content-Type"); ct != expectedCT {
+		t.Fatalf("expected Content-Type %q for /login, got %q", expectedCT, ct)
+	}
+
+	// 4. POST /login with invalid credentials (401) must return Content-Type: text/html; charset=utf-8
+	loginErrResp, err := http.PostForm(rig.server.URL+"/login", url.Values{
+		"username": {"testadmin"},
+		"password": {"WrongPassword!"},
+		"csrf":     {"invalid_csrf"},
+	})
+	if err != nil {
+		t.Fatalf("POST /login failed: %v", err)
+	}
+	defer loginErrResp.Body.Close()
+	if ct := loginErrResp.Header.Get("Content-Type"); ct != expectedCT {
+		t.Fatalf("expected Content-Type %q for invalid /login, got %q", expectedCT, ct)
+	}
+
+	// 5. Authenticated GET / (dashboard) must return Content-Type: text/html; charset=utf-8
+	client := rig.login(t, "testadmin", "ValidPassword123!")
+	dashResp, err := client.client.Get(rig.server.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / failed: %v", err)
+	}
+	defer dashResp.Body.Close()
+	if dashResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for GET /, got %d", dashResp.StatusCode)
+	}
+	if ct := dashResp.Header.Get("Content-Type"); ct != expectedCT {
+		t.Fatalf("expected Content-Type %q for GET /, got %q", expectedCT, ct)
+	}
+
+	// 6. Favicon should remain image/png
+	favResp, err := http.Get(rig.server.URL + "/favicon.ico")
+	if err != nil {
+		t.Fatalf("GET /favicon.ico failed: %v", err)
+	}
+	defer favResp.Body.Close()
+	if ct := favResp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Fatalf("expected Content-Type image/png for /favicon.ico, got %q", ct)
+	}
+}

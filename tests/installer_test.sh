@@ -332,6 +332,23 @@ test_install_script_mime() {
 }
 assert_eq "install.sh contains no forced text/plain overrides" "clean" "$(test_install_script_mime)"
 
+# Test 17: Pre-upgrade backup command context and non-empty validation
+echo "[Test 17] Testing Pre-upgrade Backup Logic"
+test_preupgrade_backup_logic() {
+    # Ensure install.sh does NOT run sudo -u alphadrive into /var/backups
+    if grep "sudo -u alphadrive.*backup.*--output" install.sh >/dev/null; then
+        echo "unprivileged_var_backups_write_bug"
+        return
+    fi
+    # Ensure install.sh verifies the backup is non-empty (-s)
+    if ! grep -F -q '[ -s "${backup_file}" ]' install.sh; then
+        echo "missing_nonempty_backup_check"
+        return
+    fi
+    echo "backup_logic_safe"
+}
+assert_eq "install.sh runs backup under proper context and validates non-empty archive" "backup_logic_safe" "$(test_preupgrade_backup_logic)"
+
 echo "============================================================"
 echo "Installer Test Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 if [ "$FAIL_COUNT" -gt 0 ]; then

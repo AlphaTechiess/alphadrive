@@ -7,11 +7,6 @@
 
 set -Eeuo pipefail
 
-# Reopen stdin from /dev/tty if running in a pipe with an active terminal
-if [ ! -t 0 ] && (exec < /dev/tty) 2>/dev/null; then
-    exec < /dev/tty
-fi
-
 # Styling & Colors
 if [ -t 1 ]; then
     RED='\033[0;31m'
@@ -39,6 +34,18 @@ warn()    { printf '%b⚠%b %s\n' "$YELLOW" "$NC" "$*"; }
 error()   { printf '%b✗%b %s\n' "$RED" "$NC" "$*" >&2; }
 debug()   { if [ "${DEBUG:-false}" = "true" ]; then printf '%b[DEBUG]%b %s\n' "$MAGENTA" "$NC" "$*" >&2; fi; }
 fatal()   { error "$*"; exit 1; }
+
+prompt_read() {
+    local prompt="$1"
+    local var_name="$2"
+    local val=""
+    if [ -t 0 ]; then
+        read -r -p "$prompt" val || true
+    elif [ -r /dev/tty ]; then
+        read -r -p "$prompt" val < /dev/tty || true
+    fi
+    eval "$var_name=\"\$val\""
+}
 
 # Global constants & variables
 REPO="AlphaTechiess/alphadrive"
@@ -427,7 +434,7 @@ run_wizard() {
         EXISTING_LISTEN="$(grep '^ALPHADRIVE_LISTEN_ADDRESS=' /etc/alphadrive/alphadrive.env | cut -d'=' -f2 || true)"
         EXISTING_URL="$(grep '^ALPHADRIVE_PUBLIC_BASE_URL=' /etc/alphadrive/alphadrive.env | cut -d'=' -f2 || true)"
         info "Current configuration detected: Listen=${EXISTING_LISTEN:-unknown}, URL=${EXISTING_URL:-unknown}"
-        read -r -p "Do you want to reconfigure network and access settings? [y/N]: " reconf_choice
+        prompt_read "Do you want to reconfigure network and access settings? [y/N]: " reconf_choice
         if [[ ! "$reconf_choice" =~ ^[yY](es)?$ ]]; then
             info "Preserving current configuration."
             return 0
@@ -443,7 +450,7 @@ How would you like to access AlphaDrive?
   3) Local / LAN (Private network deployment)
 
 EOF
-        read -r -p "Select [1-3] (default 1): " access_choice
+        prompt_read "Select [1-3] (default 1): " access_choice
         access_choice="${access_choice:-1}"
         case "$access_choice" in
             1) ACCESS_MODE=1 ;;
@@ -457,7 +464,7 @@ EOF
     if [ "$ACCESS_MODE" = "1" ] || [ "$ACCESS_MODE" = "3" ]; then
         if [ -z "$PORT" ]; then
             while true; do
-                read -r -p "Enter AlphaDrive port [${DEFAULT_PORT}]: " input_port
+                prompt_read "Enter AlphaDrive port [${DEFAULT_PORT}]: " input_port
                 input_port="${input_port:-$DEFAULT_PORT}"
                 if ! [[ "$input_port" =~ ^[0-9]+$ ]] || [ "$input_port" -lt 1 ] || [ "$input_port" -gt 65535 ]; then
                     error "Invalid port number. Please enter a port between 1 and 65535."
@@ -488,7 +495,7 @@ EOF
     elif [ "$ACCESS_MODE" = "2" ]; then
         if [ -z "$DOMAIN" ]; then
             while true; do
-                read -r -p "Enter your domain (e.g. drive.example.com): " input_domain
+                prompt_read "Enter your domain (e.g. drive.example.com): " input_domain
                 input_domain="$(echo "$input_domain" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
                 if [[ ! "$input_domain" =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
                     error "Invalid domain format. Please enter a valid FQDN (e.g. drive.example.com)."
@@ -511,7 +518,7 @@ EOF
                 echo "'${DOMAIN}' currently resolves to ${domain_ip}, but this server's public IP is ${server_ip}."
                 echo "Automatic HTTPS certificate provisioning will fail until your DNS A record points to ${server_ip}."
                 echo ""
-                read -r -p "Continue anyway? [y/N]: " dns_confirm
+                prompt_read "Continue anyway? [y/N]: " dns_confirm
                 if [[ ! "$dns_confirm" =~ ^[yY](es)?$ ]]; then
                     info "Please update your DNS records and re-run the installer."
                     exit 0
@@ -528,7 +535,7 @@ EOF
             echo "  3) Traefik (Generate configuration file)"
             echo "  0) None / Manual configuration"
             echo ""
-            read -r -p "Select [0-3] (default 1): " proxy_choice
+            prompt_read "Select [0-3] (default 1): " proxy_choice
             proxy_choice="${proxy_choice:-1}"
             case "$proxy_choice" in
                 1) PROXY="caddy" ;;

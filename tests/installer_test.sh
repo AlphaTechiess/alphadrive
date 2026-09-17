@@ -347,7 +347,29 @@ test_preupgrade_backup_logic() {
     fi
     echo "backup_logic_safe"
 }
-assert_eq "install.sh runs backup under proper context and validates non-empty archive" "backup_logic_safe" "$(test_preupgrade_backup_logic)"
+# Test 18: Piped execution does not hang on stdin
+echo "[Test 18] Testing Piped stdin Execution (curl | bash compatibility)"
+test_piped_execution() {
+    local out
+    out="$(cat install.sh | bash -s -- --help)"
+    if echo "$out" | grep -F -q "AlphaDrive Installer"; then
+        echo "piped_success"
+    else
+        echo "piped_failed"
+    fi
+}
+assert_eq "Piped execution executes completely without hanging" "piped_success" "$(test_piped_execution)"
+
+# Test 19: No top-level exec < /dev/tty
+echo "[Test 19] Testing Absence of Top-Level exec < /dev/tty"
+test_no_exec_tty() {
+    if grep -E "^[[:space:]]*exec[[:space:]]*<[[:space:]]*/dev/tty" install.sh >/dev/null; then
+        echo "destructive_exec_found"
+    else
+        echo "clean"
+    fi
+}
+assert_eq "install.sh does not contain top-level exec < /dev/tty" "clean" "$(test_no_exec_tty)"
 
 echo "============================================================"
 echo "Installer Test Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"

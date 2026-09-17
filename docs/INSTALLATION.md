@@ -9,7 +9,7 @@ This guide covers all methods for installing and deploying AlphaDrive, including
 The easiest way to install AlphaDrive on any Linux VPS is using the official automated installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)"
 ```
 
 ### What the installer does:
@@ -29,16 +29,16 @@ For automated cloud provisioning (cloud-init, Ansible, Terraform, Bash scripts),
 
 ```bash
 # Standalone VPS IP mode on port 8080 (No domain required)
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --port 8080
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --port 8080
 
 # Production custom domain with Caddy automatic SSL
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy caddy
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --domain drive.example.com --proxy caddy
 
 # Production custom domain with Nginx + Certbot
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy nginx
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --domain drive.example.com --proxy nginx
 
 # Install a specific pinned release version
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --version 1.0.5
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --version 1.0.6
 ```
 
 ### CLI Flag Reference

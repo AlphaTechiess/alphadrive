@@ -58,7 +58,7 @@ AlphaDrive Daemon (127.0.0.1:8080)
 Run this single command on any fresh Ubuntu/Debian/Rocky/RHEL/Arch VPS (amd64 / arm64):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)"
 ```
 
 The installer automatically:
@@ -76,13 +76,13 @@ For detailed installer flag documentation, proxy guides, and headless provisioni
 #### Automated / Headless Install Options
 ```bash
 # Non-interactive IP:Port setup (No domain required)
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --port 8080
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --port 8080
 
 # Non-interactive custom domain + automatic HTTPS with Caddy
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy caddy
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --domain drive.example.com --proxy caddy
 
 # Install a specific release version
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --version 1.0.1
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --version 1.0.6
 ```
 
 ---

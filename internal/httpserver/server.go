@@ -264,7 +264,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		s.renderSetup(w, r, "Password must be at least 12 characters long.", name, username, http.StatusBadRequest)
 		return
 	}
-	if password != confirmPassword {
+	if confirmPassword != "" && password != confirmPassword {
 		s.renderSetup(w, r, "Passwords do not match.", name, username, http.StatusBadRequest)
 		return
 	}

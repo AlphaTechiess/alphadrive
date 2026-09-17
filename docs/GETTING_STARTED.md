@@ -30,7 +30,7 @@ AlphaDrive is an ultra-fast, self-hosted personal cloud storage and public shari
 Run the automated one-line installer on your Linux VPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)"
 ```
 
 The installer will guide you through:
@@ -50,7 +50,7 @@ When AlphaDrive runs on a clean database, it starts in **Setup Mode**.
    - **Full Name**: (e.g. `John Doe`)
    - **Username**: Desired administrator username (3â€“32 alphanumeric characters, e.g. `admin` or `jdoe`).
    - **Password**: Secure master password (**minimum 12 characters**).
-4. Click **Complete Setup**.
+4. Click **Submit**.
 5. You are immediately logged in as the instance Owner and redirected to your **My Drive** dashboard.
 
 > **Security Note**: Once the owner account is created, setup mode is permanently closed. Subsequent account creations must be performed by an administrator via the in-app user management modal.

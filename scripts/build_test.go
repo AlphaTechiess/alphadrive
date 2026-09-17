@@ -126,7 +126,7 @@ func TestMinifyRealAppCSS(t *testing.T) {
 	criticalSelectors := []string{
 		".auth-page",
 		".auth-shell",
-		".auth-logo",
+		".auth-brand",
 		".auth-title",
 		".auth-card",
 		".form-group",

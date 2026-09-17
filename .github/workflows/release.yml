@@ -80,6 +80,7 @@ jobs:
           CSS_OUT=$(curl -s http://127.0.0.1:18080/static/css/app.css)
           echo "$CSS_OUT" | grep -F ".auth-page"
           echo "$CSS_OUT" | grep -F ".auth-shell"
+          echo "$CSS_OUT" | grep -F ".auth-brand"
           echo "$CSS_OUT" | grep -F ".auth-logo"
           echo "$CSS_OUT" | grep -F ".auth-title"
           echo "$CSS_OUT" | grep -F ".auth-card"

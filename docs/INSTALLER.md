@@ -9,7 +9,7 @@ This guide covers the architecture, configuration, operation, and troubleshootin
 AlphaDrive can be installed on any fresh Linux VPS using a single command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)"
 ```
 
 The installer handles operating system validation, architecture detection, cryptographic checksum verification, unprivileged user sandboxing, systemd service configuration, networking, reverse proxies, and pre-flight health checks.
@@ -81,13 +81,13 @@ For automated server provisioning scripts, cloud-init, Ansible, or Terraform, th
 
 ```bash
 # Automated IP:Port installation
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --port 8080
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --port 8080
 
 # Automated custom domain with Caddy HTTPS
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy caddy
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --domain drive.example.com --proxy caddy
 
 # Install a specific version release
-curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --version 1.0.1
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --version 1.0.6
 ```
 
 ### Full CLI Flag Reference

@@ -55,7 +55,7 @@ button, input {
     justify-content: center;
     padding: 24px 16px;
     position: relative;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
 .auth-page::after {
@@ -63,69 +63,86 @@ button, input {
     position: fixed;
     right: 0;
     bottom: 0;
-    width: 55vw;
-    height: 55vh;
-    min-width: 320px;
-    min-height: 280px;
+    width: 65vw;
+    height: 65vh;
+    min-width: 380px;
+    min-height: 320px;
     background: linear-gradient(
         135deg,
         transparent 0%,
-        transparent 48%,
-        var(--mint-accent) 48.5%,
+        transparent 45%,
+        var(--mint-accent) 45.5%,
         var(--cyan-accent) 100%
     );
+    border-top-left-radius: 48px;
     pointer-events: none;
     z-index: 0;
 }
 
 .auth-shell {
     width: 100%;
-    max-width: 360px;
+    max-width: 380px;
     text-align: center;
     position: relative;
     z-index: 1;
 }
 
+.auth-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin: 0 auto 28px;
+    text-decoration: none;
+}
+
+.auth-brand-icon,
 .auth-logo {
-    width: 150px;
+    width: 44px;
     height: auto;
-    margin: 0 auto 16px;
-    display: block;
+    object-fit: contain;
+}
+
+.auth-brand-text {
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--text-white);
+    letter-spacing: -0.5px;
 }
 
 .auth-title {
-    font-size: 22px;
-    font-weight: 600;
+    font-size: 18px;
+    font-weight: 400;
     color: var(--text-white);
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
 
 .auth-card {
     background: var(--bg-card);
     border-radius: 20px;
-    padding: 24px 22px;
+    padding: 28px 24px;
     position: relative;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
     text-align: left;
 }
 
 .auth-card .form-group {
-    margin-bottom: 14px;
+    margin-bottom: 18px;
 }
 
 .auth-card label {
     display: block;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 400;
     color: var(--text-white);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .auth-card input {
     width: 100%;
-    height: 42px;
+    height: 44px;
     background: var(--bg-input);
-    border-radius: 12px;
+    border-radius: 10px;
     border: 0;
     padding: 0 14px;
     color: var(--text-white);
@@ -152,12 +169,28 @@ button, input {
     transition: background 0.15s;
 }
 
-.btn-submit:hover {
+.auth-card .btn-submit {
+    width: 130px;
+    height: 42px;
+    background: var(--bg-active);
+    border-radius: 12px;
+    color: var(--text-white);
+    font-size: 15px;
+    font-weight: 600;
+    border: 0;
+    cursor: pointer;
+    margin: 22px auto 0;
+    display: block;
+    transition: background 0.15s;
+}
+
+.btn-submit:hover,
+.auth-card .btn-submit:hover {
     background: #365384;
 }
 
 .auth-error {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     color: #ff7b7b;
     font-size: 14px;
     text-align: center;
@@ -1194,8 +1227,8 @@ button, input {
     }
 
     .auth-page::after {
-        width: 65vw;
-        height: 45vh;
+        width: 75vw;
+        height: 50vh;
         min-width: 220px;
         min-height: 200px;
     }
@@ -1204,18 +1237,21 @@ button, input {
         max-width: 100%;
     }
 
-    .auth-logo {
-        width: 120px;
-        margin-bottom: 12px;
+    .auth-brand-icon {
+        width: 38px;
+    }
+
+    .auth-brand-text {
+        font-size: 24px;
     }
 
     .auth-title {
-        font-size: 20px;
-        margin-bottom: 14px;
+        font-size: 17px;
+        margin-bottom: 16px;
     }
 
     .auth-card {
-        padding: 20px 18px;
+        padding: 22px 18px;
         border-radius: 16px;
     }
 

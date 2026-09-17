@@ -35,16 +35,17 @@ error()   { printf '%b✗%b %s\n' "$RED" "$NC" "$*" >&2; }
 debug()   { if [ "${DEBUG:-false}" = "true" ]; then printf '%b[DEBUG]%b %s\n' "$MAGENTA" "$NC" "$*" >&2; fi; }
 fatal()   { error "$*"; exit 1; }
 
+# shellcheck disable=SC2034
 prompt_read() {
     local prompt="$1"
     local var_name="$2"
-    local val=""
+    local input_val=""
     if [ -t 0 ]; then
-        read -r -p "$prompt" val || true
+        read -r -p "$prompt" input_val || true
     elif [ -r /dev/tty ]; then
-        read -r -p "$prompt" val < /dev/tty || true
+        read -r -p "$prompt" input_val < /dev/tty || true
     fi
-    eval "$var_name=\"\$val\""
+    printf -v "$var_name" '%s' "$input_val"
 }
 
 # Global constants & variables
@@ -409,24 +410,26 @@ download_and_verify() {
 }
 
 run_wizard() {
+    local reconf_choice="" access_choice="" input_port="" input_domain="" dns_confirm="" proxy_choice=""
     printf '\n%b[2/7] Selecting access mode & networking...%b\n' "$BOLD" "$NC"
 
     # Non-interactive argument validation
     if [ "${NON_INTERACTIVE}" = "true" ]; then
-        ACCESS_MODE="${ACCESS_MODE:-1}"
-        PORT="${PORT:-$DEFAULT_PORT}"
-        if [ "$ACCESS_MODE" = "2" ] && [ -z "$DOMAIN" ]; then
-            fatal "--domain is required when --access-mode=2 in non-interactive mode"
-        fi
-        PROXY="${PROXY:-caddy}"
-        if [ "$ACCESS_MODE" = "2" ]; then
+        if [ -n "$DOMAIN" ]; then
+            ACCESS_MODE=2
+            PROXY="${PROXY:-caddy}"
+            PORT="${PORT:-$DEFAULT_PORT}"
             BIND_IP="${BIND_IP:-127.0.0.1}"
         else
+            ACCESS_MODE="${ACCESS_MODE:-1}"
+            PORT="${PORT:-$DEFAULT_PORT}"
             BIND_IP="${BIND_IP:-0.0.0.0}"
             PROXY="none"
         fi
         return 0
     fi
+
+    printf '\n%b[3/7] Configuring network & access settings...%b\n\n' "$BOLD" "$NC"
 
     if [ "${REPAIR_MODE}" = "true" ] && [ -f "/etc/alphadrive/alphadrive.env" ]; then
         # Load existing config for default suggestions

@@ -12,8 +12,11 @@
 </head>
 <body class="auth-page">
     <div class="auth-shell">
-        <img class="auth-logo" src="/static/images/logo.png" alt="alphadrive">
-        <h1 class="auth-title">Owner Setup</h1>
+        <div class="auth-brand">
+            <img class="auth-brand-icon" src="/static/images/logo.png" alt="alphadrive">
+            <span class="auth-brand-text">alphadrive</span>
+        </div>
+        <h1 class="auth-title">Setup owner account</h1>
         <div class="auth-card">
             {{if .Error}}
             <p class="auth-error">{{.Error}}</p>
@@ -21,22 +24,18 @@
             <form method="post" action="/setup">
                 <input type="hidden" name="csrf" value="{{.CSRF}}">
                 <div class="form-group">
-                    <label for="name">Your Name</label>
-                    <input id="name" name="name" autocomplete="name" placeholder="Admin" value="{{.Name}}" required autofocus>
+                    <label for="name">Name</label>
+                    <input id="name" name="name" autocomplete="name" value="{{.Name}}" required autofocus>
                 </div>
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input id="username" name="username" autocomplete="username" placeholder="admin" value="{{.Username}}" required>
+                    <input id="username" name="username" autocomplete="username" value="{{.Username}}" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input id="password" type="password" name="password" autocomplete="new-password" placeholder="At least 12 characters" minlength="12" required>
+                    <input id="password" type="password" name="password" autocomplete="new-password" minlength="12" required>
                 </div>
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input id="confirm_password" type="password" name="confirm_password" autocomplete="new-password" placeholder="Repeat your password" minlength="12" required>
-                </div>
-                <button class="btn-submit" type="submit">Create Owner Account</button>
+                <button class="btn-submit" type="submit">Submit</button>
             </form>
         </div>
     </div>

@@ -71,7 +71,7 @@ The installer automatically:
 
 > **Note**: A custom domain is **completely optional**. AlphaDrive runs standalone on your VPS IP without requiring Docker, Node.js, or external database engines.
 
-For detailed installer flag documentation, proxy guides, and headless provisioning, see **[Installer Documentation (`docs/INSTALLER.md`)](./docs/INSTALLER.md)**.
+For detailed installer flag documentation, proxy guides, and headless provisioning, see the **[AlphaDrive GitHub Wiki](https://github.com/AlphaTechiess/alphadrive/wiki)**.
 
 #### Automated / Headless Install Options
 ```bash
@@ -82,7 +82,7 @@ sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alpha
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --domain drive.example.com --proxy caddy
 
 # Install a specific release version
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --version 1.0.6
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh)" -- --non-interactive --version 1.1
 ```
 
 ---

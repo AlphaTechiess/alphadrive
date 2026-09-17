@@ -151,8 +151,8 @@ alphadrive version
 
 Comprehensive guides and operational runbooks are maintained on the **[AlphaDrive GitHub Wiki](https://github.com/AlphaTechiess/alphadrive/wiki)**:
 
-- [**Self-Hosting & VPS Deployment Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Self-hosting): Complete setup with Systemd, Caddy, Nginx + SSL, and zero-downtime configuration.
-- [**Backup & Disaster Recovery Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Backup-&-Disaster-Recovery-Guide): Native atomic hot backups, cron retention schedules, and restoration instructions.
+- [**Self-Hosting & VPS Deployment Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/AlphaDrive-Installation-Guide): Complete setup with Systemd, Caddy, Nginx + SSL, and zero-downtime configuration.
+- [**Backup & Disaster Recovery Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Backup,-Restore-&-Disaster-Recovery): Native atomic hot backups, cron retention schedules, and restoration instructions.
 - [**Upgrade & Maintenance Guide**](https://github.com/AlphaTechiess/alphadrive/wiki/Upgrade-&-Maintenance-Guide): Safe single-binary upgrades, automated SQLite migrations, and health diagnostics.
 
 ---

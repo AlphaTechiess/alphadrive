@@ -316,7 +316,7 @@ check_existing_install() {
         echo "  2) Repair / Reconfigure (modify settings or reinstall files)"
         echo "  3) Cancel"
         echo ""
-        read -r -p "Select [1-3] (default 1): " choice
+        prompt_read "Select [1-3] (default 1): " choice
         choice="${choice:-1}"
         case "$choice" in
             1)

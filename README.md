@@ -62,20 +62,27 @@ curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/insta
 ```
 
 The installer automatically:
-1. Detects OS and CPU architecture (x86_64 / aarch64).
-2. Downloads and cryptographically verifies (SHA256) the static release binary.
-3. Provisions a least-privilege `alphadrive` system user and sandboxed directories.
-4. Configures optional HTTPS with automatic SSL via Caddy, Nginx, or Traefik.
-5. Installs and enables a hardened `systemd` service with health checks.
-6. Installs maintenance helpers: `alphadrive-update` and `alphadrive-uninstall`.
+1. Detects OS and CPU architecture (`amd64` / `arm64`).
+2. Downloads and cryptographically verifies (SHA256) the official release binary.
+3. Provisions a least-privilege `alphadrive` system user and sandboxed directory hierarchy.
+4. Offers **VPS IP + Port** (no domain or reverse proxy needed), **Custom Domain + HTTPS** (with automated Caddy, Nginx, or Traefik), or **Local / LAN** mode.
+5. Installs and starts a hardened `systemd` service with healthcheck verification.
+6. Installs maintenance helpers: `alphadrive-update` (with pre-upgrade hot backup) and `alphadrive-uninstall`.
+
+> **Note**: A custom domain is **completely optional**. AlphaDrive runs standalone on your VPS IP without requiring Docker, Node.js, or external database engines.
+
+For detailed installer flag documentation, proxy guides, and headless provisioning, see **[Installer Documentation (`docs/INSTALLER.md`)](./docs/INSTALLER.md)**.
 
 #### Automated / Headless Install Options
 ```bash
-# Non-interactive IP:Port setup
+# Non-interactive IP:Port setup (No domain required)
 curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --port 8080
 
 # Non-interactive custom domain + automatic HTTPS with Caddy
 curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy caddy
+
+# Install a specific release version
+curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --version 1.0.1
 ```
 
 ---

@@ -82,6 +82,7 @@ func main() {
 	outPath := flag.String("output", "dist/alphadrive", "output binary path")
 	targetOS := flag.String("os", "", "target GOOS")
 	targetArch := flag.String("arch", "", "target GOARCH")
+	targetVersion := flag.String("version", "", "binary version (e.g. 1.0.1 or v1.0.1)")
 	flag.Parse()
 
 	// 1. Snapshot development files
@@ -166,14 +167,26 @@ func main() {
 	}
 	env = append(env, "CGO_ENABLED=0")
 
-	version := "1.0.0"
+	version := strings.TrimPrefix(*targetVersion, "v")
+	if version == "" {
+		version = strings.TrimPrefix(os.Getenv("VERSION"), "v")
+	}
+	if version == "" {
+		if out, err := exec.Command("git", "describe", "--tags", "--exact-match").Output(); err == nil {
+			version = strings.TrimPrefix(strings.TrimSpace(string(out)), "v")
+		}
+	}
+	if version == "" {
+		version = "1.0.1"
+	}
+
 	buildDate := time.Now().UTC().Format(time.RFC3339)
 	commit := "release"
 	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(string(out))
 	}
 
-	ldflags := fmt.Sprintf("-s -w -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.Version=%s' -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.BuildDate=%s' -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.Commit=%s'", version, buildDate, commit)
+	ldflags := fmt.Sprintf("-s -w -X 'main.Version=%s' -X 'main.BuildDate=%s' -X 'main.Commit=%s' -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.Version=%s' -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.BuildDate=%s' -X 'github.com/AlphaTechiess/alphadrive/cmd/alphadrive.Commit=%s'", version, buildDate, commit, version, buildDate, commit)
 
 	_ = os.MkdirAll(filepath.Dir(*outPath), 0755)
 	cmd := exec.Command("go", "build", "-trimpath", "-ldflags="+ldflags, "-o", *outPath, "cmd/alphadrive/main.go")

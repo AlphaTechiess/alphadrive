@@ -6,9 +6,6 @@
 
 A modern, fast, lightweight, and self-hosted cloud drive built specifically for Linux VPS servers and standalone deployments.
 
-**Repository**: [https://github.com/AlphaTechiess/alphadrive](https://github.com/AlphaTechiess/alphadrive)  
-**Donate**: [https://rzp.io/rzp/alphadrive](https://rzp.io/rzp/alphadrive)
-
 ---
 
 ## Overview
@@ -127,8 +124,6 @@ Comprehensive guides and operational runbooks are maintained on the **[AlphaDriv
 If you love using AlphaDrive and want to support ongoing development and maintenance, you can donate here:
 
 [![Donate with Razorpay](https://img.shields.io/badge/Donate-Razorpay-1688fe?style=for-the-badge&logo=razorpay&logoColor=white)](https://rzp.io/rzp/alphadrive)
-
-👉 **Donate**: [https://rzp.io/rzp/alphadrive](https://rzp.io/rzp/alphadrive)
 
 ---
 

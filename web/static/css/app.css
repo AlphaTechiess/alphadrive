@@ -770,6 +770,9 @@ button, input {
 
 .account-card {
     max-width: 440px;
+    max-height: 85vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
 }
 
 .account-user-badge {
@@ -1359,6 +1362,23 @@ button, input {
     .public-drive-main {
         padding: 0 16px 100px;
     }
+
+    .public-header {
+        padding: 18px 16px 0;
+        min-height: 56px;
+    }
+
+    .public-logo {
+        height: 32px;
+    }
+
+    .public-brand-text {
+        font-size: 22px;
+    }
+
+    .public-header-action {
+        display: none;
+    }
 }
 
 /* ==========================================================================
@@ -1371,13 +1391,42 @@ button, input {
 }
 
 .public-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
     max-width: 1200px;
     margin: 0 auto;
     padding: 24px 24px 0;
+    min-height: 72px;
 }
 
-.public-mobile-header {
-    margin-bottom: 24px;
+.public-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--text-white);
+}
+
+.public-logo {
+    height: 38px;
+    width: auto;
+    object-fit: contain;
+}
+
+.public-brand-text {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-white);
+    letter-spacing: -0.5px;
+}
+
+.public-header-action {
+    position: absolute;
+    right: 24px;
+    margin: 0 !important;
 }
 
 .public-drive-main {

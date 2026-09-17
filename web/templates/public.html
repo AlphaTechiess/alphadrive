@@ -12,20 +12,17 @@
 </head>
 <body class="public-share-page">
     <!-- Header -->
-    <header class="desktop-header public-header">
-        <a href="/" class="brand-text">alphadrive</a>
+    <header class="public-header">
+        <a href="/" class="public-brand">
+            <img src="/static/images/logo.png" alt="alphadrive" class="public-logo">
+            <span class="public-brand-text">alphadrive</span>
+        </a>
         {{if eq .State "file"}}
-            <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="download-all-btn" style="margin: 0;" download>Download file</a>
+            <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="download-all-btn public-header-action" download>Download file</a>
         {{else if eq .State "folder"}}
-            <button id="public-download-all-top" class="download-all-btn" style="margin: 0;" type="button">Download all</button>
+            <button id="public-download-all-top" class="download-all-btn public-header-action" type="button">Download all</button>
         {{end}}
     </header>
-
-    <div class="mobile-header public-mobile-header">
-        <a href="/" class="mobile-logo-link">
-            <img src="/static/images/logo.png" alt="alphadrive" class="mobile-logo">
-        </a>
-    </div>
 
     <!-- Error / Expired / Revoked State -->
     {{if eq .State "error"}}
@@ -57,7 +54,6 @@
                     </div>
                     <button type="submit" class="btn-submit">Unlock</button>
                 </form>
-                <div class="auth-corner-gradient"></div>
             </div>
         </div>
     </div>

@@ -766,19 +766,42 @@ function showAccountNotice(message, isError = false) {
 
 function setAccountTab(tab) {
     if (!accountModal) return;
-    if (accountNotice) accountNotice.hidden = true;
+    if (accountNotice) {
+        accountNotice.hidden = true;
+        accountNotice.textContent = '';
+    }
 
     accountTabUsername?.classList.toggle('active', tab === 'username');
     accountTabPassword?.classList.toggle('active', tab === 'password');
     accountTabUsers?.classList.toggle('active', tab === 'users');
 
-    if (formChangeUsername) formChangeUsername.hidden = tab !== 'username';
-    if (formChangePassword) formChangePassword.hidden = tab !== 'password';
-    if (formAddUser) formAddUser.hidden = tab !== 'users';
+    let activeForm = null;
+    if (formChangeUsername) {
+        formChangeUsername.hidden = tab !== 'username';
+        if (tab === 'username') activeForm = formChangeUsername;
+    }
+    if (formChangePassword) {
+        formChangePassword.hidden = tab !== 'password';
+        if (tab === 'password') activeForm = formChangePassword;
+    }
+    if (formAddUser) {
+        formAddUser.hidden = tab !== 'users';
+        if (tab === 'users') activeForm = formAddUser;
+    }
+
+    if (activeForm) {
+        activeForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const firstInput = activeForm.querySelector('input:not([type="hidden"]):not([disabled])');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 50);
+        }
+    }
 }
 
 async function openAccountModal() {
     if (!accountModal) return;
+    accountModal.showModal();
+    setAccountTab('username');
     try {
         const me = await api('/api/me');
         if (me) {
@@ -791,8 +814,6 @@ async function openAccountModal() {
     } catch (e) {
         console.warn('Could not fetch user details', e);
     }
-    setAccountTab('username');
-    accountModal.showModal();
 }
 
 accountBtnDesktop?.addEventListener('click', openAccountModal);

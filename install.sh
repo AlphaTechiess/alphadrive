@@ -720,28 +720,47 @@ configure_reverse_proxy() {
             local caddyfile="/etc/caddy/Caddyfile"
             if [ -f "$caddyfile" ]; then
                 cp "$caddyfile" "${caddyfile}.bak.$(date +%s)"
-                if ! grep -q "${DOMAIN}" "$caddyfile"; then
-                    cat >> "$caddyfile" << EOF
-
-${DOMAIN} {
-    reverse_proxy 127.0.0.1:${PORT}
-}
-EOF
-                fi
-            else
-                cat > "$caddyfile" << EOF
-${DOMAIN} {
-    reverse_proxy 127.0.0.1:${PORT}
-}
-EOF
             fi
 
-            if caddy validate --config "$caddyfile" >/dev/null 2>&1; then
+            cat > "$caddyfile" << EOF
+# AlphaDrive Caddy Reverse Proxy Configuration
+${DOMAIN} {
+    # Security Headers (AlphaDrive also sets these internally)
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Enable compression for static assets and HTML/text streams
+    encode zstd gzip
+
+    # Reverse proxy all requests to AlphaDrive daemon
+    # Preserves upstream Content-Type and response headers transparently
+    reverse_proxy 127.0.0.1:${PORT} {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        transport http {
+            read_buffer 16384
+            response_header_timeout 300s
+        }
+    }
+}
+EOF
+
+            local val_out
+            if val_out="$(caddy validate --config "$caddyfile" 2>&1)"; then
                 systemctl enable caddy >/dev/null 2>&1 || true
                 systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null || true
                 success "Caddy reverse proxy active for ${DOMAIN} with automatic HTTPS"
             else
-                warn "Caddy configuration validation failed. Please check /etc/caddy/Caddyfile"
+                warn "Caddy configuration validation failed:"
+                printf '%s\n' "$val_out" >&2
+                warn "Please check ${caddyfile}"
             fi
             ;;
 

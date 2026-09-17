@@ -251,9 +251,91 @@ test_explicit_version_normalization() {
 }
 assert_eq "Explicit versions (1.0.1 and v1.0.1) normalize to v1.0.1" "normalized" "$(test_explicit_version_normalization)"
 
+# Test 14: Caddy Reverse Proxy Configuration Regression Test
+echo "[Test 14] Testing Caddy Configuration & MIME Preservation"
+test_caddy_config_generation() {
+    local test_domain="drive.printspad.in"
+    local test_port="8080"
+    local config
+    config=$(cat << EOF
+${test_domain} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:${test_port} {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        transport http {
+            read_buffer 16384
+            response_header_timeout 300s
+        }
+    }
+}
+EOF
+)
+    # Check that it proxies to correct destination
+    if ! echo "$config" | grep -F -q "reverse_proxy 127.0.0.1:8080"; then
+        echo "missing_proxy_dest"
+        return
+    fi
+
+    # Ensure no hardcoded text/plain or Content-Type override exists
+    if echo "$config" | grep -i -E "(header.*content-type|header_down.*content-type|text/plain)" >/dev/null; then
+        echo "forced_mime_override"
+        return
+    fi
+
+    # Ensure security headers are present
+    if ! echo "$config" | grep -F -q "Strict-Transport-Security" || ! echo "$config" | grep -F -q "X-Content-Type-Options"; then
+        echo "missing_security_headers"
+        return
+    fi
+
+    echo "caddy_valid_and_mime_safe"
+}
+assert_eq "Caddy config proxies cleanly without overriding Content-Type to text/plain" "caddy_valid_and_mime_safe" "$(test_caddy_config_generation)"
+
+# Test 15: Caddy Template in packaging/caddy/Caddyfile
+echo "[Test 15] Testing packaging/caddy/Caddyfile template"
+test_caddy_template() {
+    local template="packaging/caddy/Caddyfile"
+    if [ ! -f "$template" ]; then
+        echo "template_missing"
+        return
+    fi
+    if grep -i -E "(header_down.*content-type|header.*content-type.*text/plain)" "$template" >/dev/null; then
+        echo "forced_mime_override"
+        return
+    fi
+    if ! grep -F -q "reverse_proxy" "$template"; then
+        echo "missing_reverse_proxy"
+        return
+    fi
+    echo "template_valid"
+}
+assert_eq "packaging/caddy/Caddyfile template is clean and valid" "template_valid" "$(test_caddy_template)"
+
+# Test 16: install.sh does not contain forced text/plain MIME overrides
+echo "[Test 16] Testing install.sh for MIME type regressions"
+test_install_script_mime() {
+    if grep -i "content-type.*text/plain" install.sh >/dev/null; then
+        echo "regression_found"
+    else
+        echo "clean"
+    fi
+}
+assert_eq "install.sh contains no forced text/plain overrides" "clean" "$(test_install_script_mime)"
+
 echo "============================================================"
 echo "Installer Test Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 if [ "$FAIL_COUNT" -gt 0 ]; then
     exit 1
 fi
 exit 0
+

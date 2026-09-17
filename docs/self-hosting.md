@@ -106,9 +106,6 @@ Caddy automatically handles HTTPS certificates and transparent proxying.
 2. Place the configuration in `/etc/caddy/Caddyfile`:
 ```caddy
 drive.yourdomain.com {
-    request_body {
-        max_size 10GB
-    }
     reverse_proxy 127.0.0.1:8080
 }
 ```

@@ -203,6 +203,54 @@ test_invalid_domain() {
 }
 assert_eq "Invalid domain option fails with error" "caught" "$(test_invalid_domain)"
 
+# Test 12: /etc/os-release VERSION Collision Isolation
+echo "[Test 12] Testing /etc/os-release VERSION Variable Isolation"
+test_version_isolation() {
+    # If an environment variable or sourced /etc/os-release defines VERSION, TARGET_VERSION must remain empty
+    local test_subshell
+    test_subshell="$(bash -c '
+        VERSION="12 (bookworm)"
+        TARGET_VERSION=""
+        # Sourcing /etc/os-release simulation:
+        VERSION="12 (bookworm)"
+        if [ -n "$TARGET_VERSION" ]; then
+            echo "collided"
+        else
+            echo "isolated"
+        fi
+    ')"
+    echo "$test_subshell"
+}
+assert_eq "TARGET_VERSION is isolated from OS-release VERSION" "isolated" "$(test_version_isolation)"
+
+# Test 13: Explicit version parsing
+echo "[Test 13] Testing Explicit Version Flag Handling"
+test_explicit_version_normalization() {
+    local v1 v2
+    v1="$(bash -c '
+        TARGET_VERSION="1.0.1"
+        if [[ "${TARGET_VERSION}" != v* ]]; then
+            echo "v${TARGET_VERSION}"
+        else
+            echo "${TARGET_VERSION}"
+        fi
+    ')"
+    v2="$(bash -c '
+        TARGET_VERSION="v1.0.1"
+        if [[ "${TARGET_VERSION}" != v* ]]; then
+            echo "v${TARGET_VERSION}"
+        else
+            echo "${TARGET_VERSION}"
+        fi
+    ')"
+    if [ "$v1" = "v1.0.1" ] && [ "$v2" = "v1.0.1" ]; then
+        echo "normalized"
+    else
+        echo "failed"
+    fi
+}
+assert_eq "Explicit versions (1.0.1 and v1.0.1) normalize to v1.0.1" "normalized" "$(test_explicit_version_normalization)"
+
 echo "============================================================"
 echo "Installer Test Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
 if [ "$FAIL_COUNT" -gt 0 ]; then

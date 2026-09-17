@@ -43,7 +43,7 @@ fatal()   { error "$*"; exit 1; }
 # Global constants & variables
 REPO="AlphaTechiess/alphadrive"
 DEFAULT_PORT=8080
-VERSION=""
+TARGET_VERSION=""
 PORT=""
 BIND_IP=""
 DOMAIN=""
@@ -109,9 +109,9 @@ parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --version)
-                VERSION="$2"; shift 2 ;;
+                TARGET_VERSION="$2"; shift 2 ;;
             --version=*)
-                VERSION="${1#*=}"; shift ;;
+                TARGET_VERSION="${1#*=}"; shift ;;
             --port)
                 PORT="$2"; shift 2 ;;
             --port=*)
@@ -173,9 +173,9 @@ validate_cli_args() {
         fi
     fi
 
-    if [ -n "$VERSION" ]; then
-        if [[ ! "$VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            fatal "Invalid version '${VERSION}'. Expected semver format (e.g. 1.0.1 or v1.0.1)."
+    if [ -n "$TARGET_VERSION" ]; then
+        if [[ ! "$TARGET_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            fatal "Invalid version '${TARGET_VERSION}'. Expected semver format (e.g. 1.0.1 or v1.0.1)."
         fi
     fi
 
@@ -325,11 +325,11 @@ check_existing_install() {
 }
 
 resolve_version() {
-    if [ -n "${VERSION}" ]; then
-        if [[ "${VERSION}" != v* ]]; then
-            RESOLVED_TAG="v${VERSION}"
+    if [ -n "${TARGET_VERSION}" ]; then
+        if [[ "${TARGET_VERSION}" != v* ]]; then
+            RESOLVED_TAG="v${TARGET_VERSION}"
         else
-            RESOLVED_TAG="${VERSION}"
+            RESOLVED_TAG="${TARGET_VERSION}"
         fi
         info "Target release version specified: ${RESOLVED_TAG}"
         return 0

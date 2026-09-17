@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -184,4 +186,24 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Built optimized production binary -> %s\n", *outPath)
+
+	// Compute SHA256 checksum
+	if binData, err := os.ReadFile(*outPath); err == nil {
+		h := sha256.Sum256(binData)
+		hashStr := hex.EncodeToString(h[:])
+		baseName := filepath.Base(*outPath)
+		checksumFile := filepath.Join(filepath.Dir(*outPath), "checksums.txt")
+		existing, _ := os.ReadFile(checksumFile)
+		lines := strings.Split(string(existing), "\n")
+		var newLines []string
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if l != "" && !strings.HasSuffix(l, " "+baseName) && !strings.HasSuffix(l, "  "+baseName) {
+				newLines = append(newLines, l)
+			}
+		}
+		newLines = append(newLines, fmt.Sprintf("%s  %s", hashStr, baseName))
+		_ = os.WriteFile(checksumFile, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
+		fmt.Printf("Updated checksums.txt -> %s (%s)\n", baseName, hashStr[:12]+"...")
+	}
 }

@@ -53,7 +53,37 @@ AlphaDrive Daemon (127.0.0.1:8080)
 
 ## Quick Start (Linux VPS)
 
-### 1. Clone, Build, and Run
+### One-Line Install (Recommended)
+
+Run this single command on any fresh Ubuntu/Debian/Rocky/RHEL/Arch VPS (amd64 / arm64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash
+```
+
+The installer automatically:
+1. Detects OS and CPU architecture (x86_64 / aarch64).
+2. Downloads and cryptographically verifies (SHA256) the static release binary.
+3. Provisions a least-privilege `alphadrive` system user and sandboxed directories.
+4. Configures optional HTTPS with automatic SSL via Caddy, Nginx, or Traefik.
+5. Installs and enables a hardened `systemd` service with health checks.
+6. Installs maintenance helpers: `alphadrive-update` and `alphadrive-uninstall`.
+
+#### Automated / Headless Install Options
+```bash
+# Non-interactive IP:Port setup
+curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --port 8080
+
+# Non-interactive custom domain + automatic HTTPS with Caddy
+curl -fsSL https://raw.githubusercontent.com/AlphaTechiess/alphadrive/main/install.sh | sudo bash -s -- --non-interactive --domain drive.example.com --proxy caddy
+```
+
+---
+
+### Manual Build & Run
+
+If you prefer building from source:
+
 ```bash
 # Clone repository
 git clone https://github.com/AlphaTechiess/alphadrive.git
@@ -66,8 +96,9 @@ go build -ldflags "-s -w" -o alphadrive ./cmd/alphadrive
 ./alphadrive serve
 ```
 
-### 2. Complete Setup in Browser
-Open `http://localhost:8080` (or your VPS address) in your browser.
+### Complete Setup in Browser
+
+Open `http://<your-vps-ip>:8080` (or `https://your-domain.com`) in your browser.
 AlphaDrive will automatically display the **Owner Setup** screen to create your admin account:
 - Enter your Name, Username, and Password (minimum 12 characters).
 - Click **Create Owner Account** — you are immediately logged in and ready to manage files!

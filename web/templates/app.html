@@ -23,7 +23,7 @@
             <input id="search" type="search" placeholder="" aria-label="Search files">
         </div>
         <div class="header-user-wrap">
-            <button class="avatar-button" aria-label="Account details" title="{{.Username}}">
+            <button id="account-btn-desktop" class="avatar-button" aria-label="Account details" title="{{.Username}}">
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#6178a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
@@ -74,6 +74,13 @@
                 <button id="mobile-nav-trash" class="mobile-tab-btn" type="button">
                     <img src="/static/images/bin.svg" alt="" class="mobile-tab-icon">
                     <span>Trash</span>
+                </button>
+                <button id="account-btn-mobile" class="mobile-tab-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Account</span>
                 </button>
             </div>
         </div>
@@ -246,6 +253,99 @@
                 </div>
                 <button type="submit" class="btn-submit" style="margin-top: 8px;">Create link</button>
             </form>
+        </div>
+    </dialog>
+
+    <!-- Account Settings Modal Dialog -->
+    <dialog id="account-modal" class="info-dialog">
+        <div class="info-card account-card">
+            <div class="info-header">
+                <h2>Account Settings</h2>
+                <button id="account-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+
+            <!-- User Badge -->
+            <div class="account-user-badge">
+                <div class="account-badge-avatar">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+                <div class="account-badge-info">
+                    <div id="account-current-name" class="account-badge-name">{{if .Name}}{{.Name}}{{else}}{{.Username}}{{end}}</div>
+                    <div class="account-badge-sub">
+                        <span id="account-current-username">@{{.Username}}</span>
+                        <span id="account-badge-role" class="account-role-pill">User</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tabs -->
+            <div class="account-tabs">
+                <button id="account-tab-username" class="account-tab-btn active" type="button">Username</button>
+                <button id="account-tab-password" class="account-tab-btn" type="button">Password</button>
+                <button id="account-tab-users" class="account-tab-btn" type="button" hidden>Add user</button>
+            </div>
+
+            <div id="account-notice" class="account-notice" hidden></div>
+
+            <!-- Tab 1: Change Username -->
+            <form id="form-change-username" class="account-section">
+                <div class="form-group">
+                    <label for="settings-new-username">New Username</label>
+                    <input id="settings-new-username" type="text" placeholder="Enter new username" required minlength="3" maxlength="32">
+                </div>
+                <button type="submit" class="btn-submit">Save Username</button>
+            </form>
+
+            <!-- Tab 2: Change Password -->
+            <form id="form-change-password" class="account-section" hidden>
+                <div class="form-group">
+                    <label for="settings-current-password">Current Password</label>
+                    <input id="settings-current-password" type="password" placeholder="Enter current password" required>
+                </div>
+                <div class="form-group">
+                    <label for="settings-new-password">New Password (min 12 chars)</label>
+                    <input id="settings-new-password" type="password" placeholder="At least 12 characters" required minlength="12">
+                </div>
+                <div class="form-group">
+                    <label for="settings-confirm-password">Confirm New Password</label>
+                    <input id="settings-confirm-password" type="password" placeholder="Repeat new password" required minlength="12">
+                </div>
+                <button type="submit" class="btn-submit">Update Password</button>
+            </form>
+
+            <!-- Tab 3: Add User (Admin only) -->
+            <form id="form-add-user" class="account-section" hidden>
+                <div class="form-group">
+                    <label for="newuser-name">Full Name</label>
+                    <input id="newuser-name" type="text" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="newuser-username">Username</label>
+                    <input id="newuser-username" type="text" placeholder="e.g. jdoe" required minlength="3" maxlength="32">
+                </div>
+                <div class="form-group">
+                    <label for="newuser-password">Password (min 12 chars)</label>
+                    <input id="newuser-password" type="password" placeholder="At least 12 characters" required minlength="12">
+                </div>
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label" for="newuser-is-admin">
+                        <input id="newuser-is-admin" type="checkbox">
+                        <span>Grant Administrator access</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn-submit">Create User</button>
+            </form>
+
+            <!-- Logout Link -->
+            <div class="account-modal-footer">
+                <form method="post" action="/logout" style="width: 100%;">
+                    <input type="hidden" name="csrf" value="{{.CSRF}}">
+                    <button type="submit" class="btn-logout-alt">Log out</button>
+                </form>
+            </div>
         </div>
     </dialog>
 

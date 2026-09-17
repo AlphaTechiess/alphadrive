@@ -756,6 +756,212 @@ button, input {
 }
 
 /* ==========================================================================
+   Account Settings Modal
+   ========================================================================== */
+
+.account-card {
+    max-width: 440px;
+}
+
+.account-user-badge {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-input);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+}
+
+.account-badge-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 245, 215, 0.12);
+    border: 1.5px solid var(--mint-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mint-accent);
+    flex-shrink: 0;
+}
+
+.account-badge-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.account-badge-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-white);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-badge-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.account-role-pill {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.18);
+    color: var(--cyan-accent);
+    border: 1px solid rgba(0, 212, 255, 0.35);
+}
+
+.account-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: var(--bg-input);
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.account-tab-btn {
+    flex: 1;
+    height: 36px;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.account-tab-btn:hover {
+    color: var(--text-white);
+}
+
+.account-tab-btn.active {
+    background: var(--bg-active);
+    color: var(--text-white);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.account-notice {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.account-notice.notice-success {
+    background: rgba(0, 245, 215, 0.12);
+    border: 1px solid var(--mint-accent);
+    color: var(--mint-accent);
+}
+
+.account-notice.notice-error {
+    background: rgba(255, 92, 92, 0.12);
+    border: 1px solid #ff5c5c;
+    color: #ff7b7b;
+}
+
+.account-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.account-section .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.account-section label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.account-section input[type="text"],
+.account-section input[type="password"] {
+    height: 42px;
+    background: var(--bg-input);
+    border: 1px solid rgba(133, 148, 176, 0.2);
+    border-radius: 12px;
+    padding: 0 14px;
+    color: var(--text-white);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.account-section input[type="text"]:focus,
+.account-section input[type="password"]:focus {
+    border-color: var(--cyan-accent);
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+.checkbox-group {
+    flex-direction: row !important;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 14px !important;
+    color: var(--text-white) !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--mint-accent);
+    cursor: pointer;
+}
+
+.account-modal-footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(133, 148, 176, 0.2);
+    display: flex;
+    justify-content: center;
+}
+
+.btn-logout-alt {
+    width: 100%;
+    height: 40px;
+    background: transparent;
+    border: 1px solid rgba(255, 92, 92, 0.4);
+    border-radius: 12px;
+    color: #ff7b7b;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-logout-alt:hover {
+    background: rgba(255, 92, 92, 0.15);
+    border-color: #ff5c5c;
+    color: #fff;
+}
+
+/* ==========================================================================
    File Preview Modal
    ========================================================================== */
 

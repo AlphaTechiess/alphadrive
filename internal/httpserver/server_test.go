@@ -982,3 +982,148 @@ func TestOwnerSetupFlow(t *testing.T) {
 		t.Fatalf("expected 303 redirect to / after setup, got %d loc %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
 }
+
+func TestAccountSettingsAPI(t *testing.T) {
+	rig := setupTestRig(t)
+
+	// Create an admin user and a regular user
+	adminPass := "AdminMasterPass123!"
+	adminHash, _ := auth.HashPassword(adminPass)
+	srv := New(rig.cfg, rig.db.DB, rig.files, rig.shares)
+	if err := srv.CreateUser(context.Background(), "adminuser", adminHash, true); err != nil {
+		t.Fatalf("create admin user: %v", err)
+	}
+
+	userPass := "RegularUserPass123!"
+	userHash, _ := auth.HashPassword(userPass)
+	if err := srv.CreateUser(context.Background(), "normaluser", userHash, false); err != nil {
+		t.Fatalf("create normal user: %v", err)
+	}
+
+	adminClient := rig.login(t, "adminuser", adminPass)
+	normalClient := rig.login(t, "normaluser", userPass)
+
+	// 1. Username change test
+	// 1a. Invalid username format
+	status := normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/username", map[string]string{
+		"new_username": "invalid user name with spaces",
+	}, nil)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid username format, got %d", status)
+	}
+
+	// 1b. Duplicate username
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/username", map[string]string{
+		"new_username": "adminuser",
+	}, nil)
+	if status != http.StatusConflict {
+		t.Fatalf("expected 409 for duplicate username, got %d", status)
+	}
+
+	// 1c. Valid username change
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/username", map[string]string{
+		"new_username": "renameduser",
+	}, nil)
+	if status != http.StatusOK {
+		t.Fatalf("expected 200 for valid username change, got %d", status)
+	}
+
+	// Verify /api/me reflects renamed username
+	meReq, _ := http.NewRequest("GET", rig.server.URL+"/api/me", nil)
+	meResp, err := normalClient.client.Do(meReq)
+	if err != nil {
+		t.Fatalf("get /api/me: %v", err)
+	}
+	var meData struct {
+		Username string `json:"username"`
+		IsAdmin  bool   `json:"is_admin"`
+	}
+	_ = json.NewDecoder(meResp.Body).Decode(&meData)
+	if meData.Username != "renameduser" {
+		t.Fatalf("expected username 'renameduser', got %q", meData.Username)
+	}
+	if meData.IsAdmin != false {
+		t.Fatalf("expected is_admin false for normal user")
+	}
+
+	// 2. Password change test
+	// 2a. Wrong current password
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/password", map[string]string{
+		"current_password": "WrongPassword123!",
+		"new_password":     "BrandNewPassword123!",
+	}, nil)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong current password, got %d", status)
+	}
+
+	// 2b. New password too short
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/password", map[string]string{
+		"current_password": userPass,
+		"new_password":     "short123",
+	}, nil)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for short new password, got %d", status)
+	}
+
+	// 2c. Successful password update
+	newPassword := "BrandNewPassword123!"
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/password", map[string]string{
+		"current_password": userPass,
+		"new_password":     newPassword,
+	}, nil)
+	if status != http.StatusOK {
+		t.Fatalf("expected 200 for valid password update, got %d", status)
+	}
+
+	// Verify login with new credentials succeeds
+	newLoginClient := rig.login(t, "renameduser", newPassword)
+	if newLoginClient == nil {
+		t.Fatalf("expected successful login with new password")
+	}
+
+	// 3. User creation test
+	// 3a. Normal user cannot create new users (403)
+	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/users", map[string]any{
+		"username": "thirduser",
+		"password": "ThirdUserPassword123!",
+	}, nil)
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403 for non-admin user creation, got %d", status)
+	}
+
+	// 3b. Admin user creating user with short password (400)
+	status = adminClient.doJSON(t, "POST", rig.server.URL+"/api/account/users", map[string]any{
+		"username": "thirduser",
+		"password": "short",
+	}, nil)
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for short password in add user, got %d", status)
+	}
+
+	// 3c. Admin creates new user successfully (201)
+	thirdPass := "ThirdUserPassword123!"
+	status = adminClient.doJSON(t, "POST", rig.server.URL+"/api/account/users", map[string]any{
+		"username": "thirduser",
+		"name":     "Third Member",
+		"password": thirdPass,
+		"is_admin": false,
+	}, nil)
+	if status != http.StatusCreated {
+		t.Fatalf("expected 201 for admin creating user, got %d", status)
+	}
+
+	// 3d. Duplicate user creation (409)
+	status = adminClient.doJSON(t, "POST", rig.server.URL+"/api/account/users", map[string]any{
+		"username": "thirduser",
+		"password": thirdPass,
+	}, nil)
+	if status != http.StatusConflict {
+		t.Fatalf("expected 409 for duplicate username creation, got %d", status)
+	}
+
+	// Verify newly created user can log in
+	thirdClient := rig.login(t, "thirduser", thirdPass)
+	if thirdClient == nil {
+		t.Fatalf("expected successful login for newly created thirduser")
+	}
+}

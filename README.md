@@ -12,6 +12,8 @@ AlphaDrive provides an elegant web interface and public sharing platform for per
 
 - **Single Compiled Binary**: Entire backend and web assets (HTML/CSS/JS/SVGs) are embedded directly into a single static executable.
 - **Minimal Footprint**: Written in pure Go with standard `net/http` and pure-Go SQLite (`modernc.org/sqlite`).
+- **Instant Owner Onboarding**: Zero-CLI setup; first browser visit automatically presents the Owner Setup screen to create your administrator account.
+- **In-App Account & User Management**: Easily update your username, change password, or provision new team members straight from the header settings dialog.
 - **Physical Disk Telemetry**: Live VPS disk detection reporting real total, used, and free filesystem space.
 - **Public Sharing Engine**: Secure custom or auto-generated link slugs (`[a-z0-9-]`), optional Argon2id password protection, configurable link expiry, instant revocation, and streaming multi-file ZIP downloads.
 - **Multi-Format Previews**: In-browser preview for images, video streaming, audio player, PDF viewer, and code/text viewer.
@@ -46,32 +48,41 @@ AlphaDrive Daemon (127.0.0.1:8080)
 
 ## Quick Start (Linux VPS)
 
-### 1. Build from Source
+### 1. Build and Run
 ```bash
-go build -ldflags "-s -w -X main.Version=1.0.0 -X main.BuildDate=$(date -u +%Y-%m-%d) -X main.Commit=$(git rev-parse --short HEAD)" -o alphadrive ./cmd/alphadrive
-```
+# Build binary
+go build -ldflags "-s -w" -o alphadrive ./cmd/alphadrive
 
-### 2. Create Initial Admin User
-```bash
-ALPHADRIVE_PASSWORD="YourStrongPassword123" ./alphadrive create-user --username admin --admin=true
-```
-
-### 3. Run Server
-```bash
+# Start AlphaDrive
 ./alphadrive serve
 ```
+
+### 2. Complete Setup in Browser
+Open `http://localhost:8080` (or your VPS address) in your browser.
+AlphaDrive will automatically display the **Owner Setup** screen to create your admin account:
+- Enter your Name, Username, and Password (minimum 12 characters).
+- Click **Create Owner Account** — you are immediately logged in and ready to manage files!
+
+---
+
+## In-App Account Settings
+
+Click the **Account Icon** in the top-right corner to manage your profile anytime:
+- **Username Tab**: Update your active login username.
+- **Password Tab**: Securely change your account password (verifies current password).
+- **Add User Tab** *(Admin only)*: Easily invite or provision new users directly from the web interface without using the command line.
 
 ---
 
 ## CLI Reference
 
-AlphaDrive includes complete operations tooling in the single binary:
+AlphaDrive also includes complete operations tooling in the single binary for headless or scriptable workflows:
 
 ```bash
 # Start server
 alphadrive serve [--config /path/to/config.json]
 
-# Create a new user (minimum 12-character password)
+# Create a new user via CLI (optional alternative to web UI)
 ALPHADRIVE_PASSWORD="YourPassword123" alphadrive create-user --username <name> [--admin=true]
 
 # Reset an existing user's password and revoke active sessions

@@ -43,6 +43,7 @@ type Server struct {
 }
 type principal struct {
 	UserID, Username, Name string
+	IsAdmin                bool
 	CSRF                   string
 }
 type contextKey string
@@ -162,6 +163,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/shares", s.require(s.csrf(s.createShare)))
 	mux.HandleFunc("GET /api/shares", s.require(s.listShares))
 	mux.HandleFunc("DELETE /api/shares/{id}", s.require(s.csrf(s.revokeShare)))
+
+	// Account Settings APIs
+	mux.HandleFunc("POST /api/account/username", s.require(s.csrf(s.updateUsername)))
+	mux.HandleFunc("POST /api/account/password", s.require(s.csrf(s.updatePassword)))
+	mux.HandleFunc("POST /api/account/users", s.require(s.csrf(s.addUser)))
 
 	// Public Share Routes
 	mux.HandleFunc("GET /s/{slug}", s.publicSharePage)
@@ -413,6 +419,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"username":                    p.Username,
 		"name":                        p.Name,
+		"is_admin":                    p.IsAdmin,
 		"root_id":                     files.RootID(p.UserID),
 		"alphadrive_used_bytes":       alphadriveUsed,
 		"used_bytes":                  alphadriveUsed,
@@ -687,9 +694,10 @@ func (s *Server) loadPrincipal(r *http.Request) (principal, bool) {
 	}
 	var p principal
 	var name sql.NullString
+	var isAdmin int
 	var csrfSecret []byte
 	var expires, revoked, lastSeen sql.NullInt64
-	err := s.db.QueryRowContext(r.Context(), `SELECT u.id,u.username,COALESCE(u.name, ''),s.csrf_secret,s.expires_at,s.revoked_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.disabled_at IS NULL`, hash).Scan(&p.UserID, &p.Username, &name, &csrfSecret, &expires, &revoked, &lastSeen)
+	err := s.db.QueryRowContext(r.Context(), `SELECT u.id,u.username,COALESCE(u.name, ''),u.is_admin,s.csrf_secret,s.expires_at,s.revoked_at,s.last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND u.disabled_at IS NULL`, hash).Scan(&p.UserID, &p.Username, &name, &isAdmin, &csrfSecret, &expires, &revoked, &lastSeen)
 	now := time.Now()
 	if err != nil || revoked.Valid || expires.Int64 < now.Unix() || lastSeen.Int64 < now.Add(-s.cfg.SessionIdleTimeout).Unix() {
 		return principal{}, false
@@ -698,8 +706,175 @@ func (s *Server) loadPrincipal(r *http.Request) (principal, bool) {
 		_, _ = s.db.ExecContext(r.Context(), `UPDATE sessions SET last_seen_at=? WHERE token_hash=?`, now.Unix(), hash)
 	}
 	p.Name = name.String
+	p.IsAdmin = (isAdmin == 1)
 	p.CSRF = auth.CSRF(csrfSecret)
 	return p, true
+}
+
+func (s *Server) updateUsername(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	var input struct {
+		NewUsername string `json:"new_username"`
+		Username    string `json:"username"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	newUsername := strings.TrimSpace(input.NewUsername)
+	if newUsername == "" {
+		newUsername = strings.TrimSpace(input.Username)
+	}
+	if newUsername == "" || len(newUsername) < 3 || len(newUsername) > 32 {
+		apiError(w, http.StatusBadRequest, "invalid_username", "Username must be between 3 and 32 characters.")
+		return
+	}
+	for _, ch := range newUsername {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-' || ch == '.') {
+			apiError(w, http.StatusBadRequest, "invalid_username", "Username contains invalid characters.")
+			return
+		}
+	}
+	now := time.Now().UTC().Unix()
+	_, err := s.db.ExecContext(r.Context(), `UPDATE users SET username=?, updated_at=? WHERE id=?`, newUsername, now, p.UserID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			apiError(w, http.StatusConflict, "username_taken", "That username is already taken.")
+			return
+		}
+		internalError(w, r, err)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"status": "ok", "username": newUsername})
+}
+
+func (s *Server) updatePassword(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	var input struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if len(input.NewPassword) < 12 {
+		apiError(w, http.StatusBadRequest, "invalid_password", "New password must be at least 12 characters long.")
+		return
+	}
+
+	var currentHash string
+	err := s.db.QueryRowContext(r.Context(), `SELECT password_hash FROM users WHERE id=?`, p.UserID).Scan(&currentHash)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	if !auth.VerifyPassword(currentHash, input.CurrentPassword) {
+		apiError(w, http.StatusUnauthorized, "invalid_current_password", "Current password is incorrect.")
+		return
+	}
+
+	newHash, err := auth.HashPassword(input.NewPassword)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	now := time.Now().UTC().Unix()
+	tx, err := s.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(r.Context(), `UPDATE users SET password_hash=?, updated_at=? WHERE id=?`, newHash, now, p.UserID); err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	// Revoke other active sessions for this user except current session
+	currentHashToken := tokenHash(r)
+	if currentHashToken != nil {
+		_, _ = tx.ExecContext(r.Context(), `UPDATE sessions SET revoked_at=? WHERE user_id=? AND token_hash!=?`, now, p.UserID, currentHashToken)
+	}
+
+	if err := tx.Commit(); err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+func (s *Server) addUser(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	if !p.IsAdmin {
+		apiError(w, http.StatusForbidden, "forbidden", "Only administrators can add new users.")
+		return
+	}
+	var input struct {
+		Name     string `json:"name"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		IsAdmin  bool   `json:"is_admin"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	name := strings.TrimSpace(input.Name)
+	username := strings.TrimSpace(input.Username)
+	password := input.Password
+
+	if username == "" || len(username) < 3 || len(username) > 32 {
+		apiError(w, http.StatusBadRequest, "invalid_username", "Username must be between 3 and 32 characters.")
+		return
+	}
+	for _, ch := range username {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-' || ch == '.') {
+			apiError(w, http.StatusBadRequest, "invalid_username", "Username contains invalid characters.")
+			return
+		}
+	}
+	if len(password) < 12 {
+		apiError(w, http.StatusBadRequest, "invalid_password", "Password must be at least 12 characters long.")
+		return
+	}
+
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	userID, err := id()
+	if err != nil {
+		internalError(w, r, err)
+		return
+	}
+
+	now := time.Now().UTC().Unix()
+	_, err = s.db.ExecContext(r.Context(), `INSERT INTO users(id,name,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?,?,?,?,?,?)`, userID, name, username, hash, boolInt(input.IsAdmin), now, now)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			apiError(w, http.StatusConflict, "username_taken", "That username is already taken.")
+			return
+		}
+		internalError(w, r, err)
+		return
+	}
+
+	if err := s.files.EnsureRoot(r.Context(), userID); err != nil {
+		slog.Error("failed to ensure root for new user", "error", err)
+	}
+
+	jsonResponse(w, http.StatusCreated, map[string]any{
+		"status": "ok",
+		"user": map[string]any{
+			"id":       userID,
+			"name":     name,
+			"username": username,
+			"is_admin": input.IsAdmin,
+		},
+	})
 }
 func (s *Server) principal(r *http.Request) (principal, bool) {
 	p, ok := r.Context().Value(principalKey).(principal)

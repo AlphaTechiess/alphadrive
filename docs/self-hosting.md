@@ -57,14 +57,7 @@ sudo chown root:alphadrive /etc/alphadrive/alphadrive.env
 sudo chmod 640 /etc/alphadrive/alphadrive.env
 ```
 
-### Step 3: Create Initial Admin User
-
-```bash
-sudo -u alphadrive ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data ALPHADRIVE_PASSWORD="YourStrongSecurePassword123" /usr/local/bin/alphadrive create-user --username admin --admin=true
-```
-
-### Step 4: Install and Enable Systemd Service
-
+### Step 3: Install and Enable Systemd Service
 ```bash
 sudo cp packaging/systemd/alphadrive.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -76,9 +69,27 @@ Verify service status:
 sudo systemctl status alphadrive
 ```
 
+### Step 4: Complete Owner Setup in Browser
+Navigate to your instance domain or IP (e.g. `https://drive.yourdomain.com`).
+Because no users exist yet, AlphaDrive will automatically display the **Owner Setup** screen:
+1. Provide your Name, Administrator Username, and Password (minimum 12 characters).
+2. Click **Create Owner Account**.
+3. You will be logged in immediately.
+
+*Note: You can also provision users via CLI using `alphadrive create-user` if preferred.*
+
 ---
 
-## 3. Reverse Proxy Configuration
+## 3. In-App User & Account Management
+
+Administrators and users can manage credentials directly in the web UI by clicking the **Account Icon** in the top-right navigation bar:
+- **Change Username**: Update login handle with live availability checks.
+- **Update Password**: Update login password with old password verification and $\ge 12$-character enforcement.
+- **Add Users (Admin)**: Create new users (with optional Admin privileges) straight from the UI. No server CLI access needed!
+
+---
+
+## 4. Reverse Proxy Configuration
 
 ### Option A: Caddy (Recommended)
 
@@ -111,7 +122,7 @@ sudo certbot --nginx -d drive.yourdomain.com
 
 ---
 
-## 4. Operational CLI Commands
+## 5. Operational CLI Commands
 
 ### Health & Integrity Diagnostics (`doctor`)
 Run non-destructive SQLite integrity checks, verify physical object consistency, and report filesystem capacity:

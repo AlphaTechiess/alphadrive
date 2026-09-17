@@ -12,6 +12,28 @@ const storageBar = document.querySelector('#storage-bar');
 const sidebarStorage = document.querySelector('#sidebar-storage');
 const infoModal = document.querySelector('#info-modal');
 const storageModal = document.querySelector('#storage-modal');
+const accountModal = document.querySelector('#account-modal');
+const accountBtnDesktop = document.querySelector('#account-btn-desktop');
+const accountBtnMobile = document.querySelector('#account-btn-mobile');
+const accountCloseBtn = document.querySelector('#account-close');
+const accountNotice = document.querySelector('#account-notice');
+const accountTabUsername = document.querySelector('#account-tab-username');
+const accountTabPassword = document.querySelector('#account-tab-password');
+const accountTabUsers = document.querySelector('#account-tab-users');
+const formChangeUsername = document.querySelector('#form-change-username');
+const formChangePassword = document.querySelector('#form-change-password');
+const formAddUser = document.querySelector('#form-add-user');
+const accountCurrentName = document.querySelector('#account-current-name');
+const accountCurrentUsername = document.querySelector('#account-current-username');
+const accountBadgeRole = document.querySelector('#account-badge-role');
+const settingsNewUsername = document.querySelector('#settings-new-username');
+const settingsCurrentPassword = document.querySelector('#settings-current-password');
+const settingsNewPassword = document.querySelector('#settings-new-password');
+const settingsConfirmPassword = document.querySelector('#settings-confirm-password');
+const newuserName = document.querySelector('#newuser-name');
+const newuserUsername = document.querySelector('#newuser-username');
+const newuserPassword = document.querySelector('#newuser-password');
+const newuserIsAdmin = document.querySelector('#newuser-is-admin');
 const previewModal = document.querySelector('#preview-modal');
 const previewTitle = document.querySelector('#preview-title');
 const previewIcon = document.querySelector('#preview-icon');
@@ -730,12 +752,153 @@ sidebarStorage?.addEventListener('keydown', event => {
     }
 });
 
-document.querySelector('.avatar-button')?.addEventListener('click', () => {
-    storageModal?.showModal();
-});
-
 document.querySelector('#storage-close')?.addEventListener('click', () => {
     storageModal?.close();
+});
+
+// Account settings modal implementation
+function showAccountNotice(message, isError = false) {
+    if (!accountNotice) return;
+    accountNotice.hidden = false;
+    accountNotice.textContent = message;
+    accountNotice.className = isError ? 'account-notice notice-error' : 'account-notice notice-success';
+}
+
+function setAccountTab(tab) {
+    if (!accountModal) return;
+    if (accountNotice) accountNotice.hidden = true;
+
+    accountTabUsername?.classList.toggle('active', tab === 'username');
+    accountTabPassword?.classList.toggle('active', tab === 'password');
+    accountTabUsers?.classList.toggle('active', tab === 'users');
+
+    if (formChangeUsername) formChangeUsername.hidden = tab !== 'username';
+    if (formChangePassword) formChangePassword.hidden = tab !== 'password';
+    if (formAddUser) formAddUser.hidden = tab !== 'users';
+}
+
+async function openAccountModal() {
+    if (!accountModal) return;
+    try {
+        const me = await api('/api/me');
+        if (me) {
+            if (accountCurrentName) accountCurrentName.textContent = me.name || me.username;
+            if (accountCurrentUsername) accountCurrentUsername.textContent = `@${me.username}`;
+            if (accountBadgeRole) accountBadgeRole.textContent = me.is_admin ? 'Admin' : 'User';
+            if (accountTabUsers) accountTabUsers.hidden = !me.is_admin;
+            if (settingsNewUsername) settingsNewUsername.value = me.username;
+        }
+    } catch (e) {
+        console.warn('Could not fetch user details', e);
+    }
+    setAccountTab('username');
+    accountModal.showModal();
+}
+
+accountBtnDesktop?.addEventListener('click', openAccountModal);
+accountBtnMobile?.addEventListener('click', openAccountModal);
+accountCloseBtn?.addEventListener('click', () => accountModal?.close());
+accountModal?.addEventListener('click', event => {
+    if (event.target === accountModal) {
+        accountModal.close();
+    }
+});
+
+accountTabUsername?.addEventListener('click', () => setAccountTab('username'));
+accountTabPassword?.addEventListener('click', () => setAccountTab('password'));
+accountTabUsers?.addEventListener('click', () => setAccountTab('users'));
+
+formChangeUsername?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const newUsername = (settingsNewUsername?.value || '').trim();
+    if (!newUsername) return;
+
+    try {
+        const res = await api('/api/account/username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_username: newUsername }),
+        });
+        showAccountNotice(res.message || 'Username updated successfully');
+        if (accountCurrentUsername) accountCurrentUsername.textContent = `@${res.username}`;
+        if (accountBtnDesktop) accountBtnDesktop.title = res.username;
+    } catch (err) {
+        showAccountNotice(err.message, true);
+    }
+});
+
+formChangePassword?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const currentPassword = settingsCurrentPassword?.value || '';
+    const newPassword = settingsNewPassword?.value || '';
+    const confirmPassword = settingsConfirmPassword?.value || '';
+
+    if (!currentPassword) {
+        showAccountNotice('Current password is required', true);
+        return;
+    }
+    if (newPassword.length < 12) {
+        showAccountNotice('New password must be at least 12 characters', true);
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        showAccountNotice('New passwords do not match', true);
+        return;
+    }
+
+    try {
+        const res = await api('/api/account/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword,
+            }),
+        });
+        showAccountNotice(res.message || 'Password changed successfully');
+        if (settingsCurrentPassword) settingsCurrentPassword.value = '';
+        if (settingsNewPassword) settingsNewPassword.value = '';
+        if (settingsConfirmPassword) settingsConfirmPassword.value = '';
+    } catch (err) {
+        showAccountNotice(err.message, true);
+    }
+});
+
+formAddUser?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const username = (newuserUsername?.value || '').trim();
+    const name = (newuserName?.value || '').trim();
+    const password = newuserPassword?.value || '';
+    const isAdmin = !!newuserIsAdmin?.checked;
+
+    if (!username) {
+        showAccountNotice('Username is required', true);
+        return;
+    }
+    if (password.length < 12) {
+        showAccountNotice('Password must be at least 12 characters', true);
+        return;
+    }
+
+    try {
+        const res = await api('/api/account/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username,
+                name,
+                password,
+                is_admin: isAdmin,
+            }),
+        });
+        showAccountNotice(res.message || 'User created successfully');
+        if (newuserUsername) newuserUsername.value = '';
+        if (newuserName) newuserName.value = '';
+        if (newuserPassword) newuserPassword.value = '';
+        if (newuserIsAdmin) newuserIsAdmin.checked = false;
+    } catch (err) {
+        showAccountNotice(err.message, true);
+    }
 });
 
 // File preview implementation

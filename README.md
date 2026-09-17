@@ -1,7 +1,7 @@
 # AlphaDrive
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-AlphaTechiess%2Falphadrive-blue?logo=github)](https://github.com/AlphaTechiess/alphadrive)
-[![Donate with Razorpay](https://img.shields.io/badge/Donate-Razorpay-1688fe?logo=razorpay&logoColor=white)](https://rzp.io/rzp/alphadrive)
+[![Contribute with Razorpay](https://img.shields.io/badge/Contribute-Razorpay-1688fe?logo=razorpay&logoColor=white)](https://rzp.io/rzp/alphadrive)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/AlphaTechiess/alphadrive/blob/main/LICENSE)
 
 A modern, fast, lightweight, and self-hosted cloud drive built specifically for Linux VPS servers and standalone deployments.
@@ -119,11 +119,11 @@ Comprehensive guides and operational runbooks are maintained on the **[AlphaDriv
 
 ---
 
-## Support & Donate
+## Support & Contribution
 
-If you love using AlphaDrive and want to support ongoing development and maintenance, you can donate here:
+If you love using AlphaDrive and want to support ongoing development and maintenance, you can contribute here:
 
-[![Donate with Razorpay](https://img.shields.io/badge/Donate-Razorpay-1688fe?style=for-the-badge&logo=razorpay&logoColor=white)](https://rzp.io/rzp/alphadrive)
+[![Contribute with Razorpay](https://img.shields.io/badge/Contribute-Razorpay-1688fe?style=for-the-badge&logo=razorpay&logoColor=white)](https://rzp.io/rzp/alphadrive)
 
 ---
 

@@ -66,6 +66,27 @@ jobs:
             exit 1
           fi
 
+      - name: Validate built binary and production assets
+        run: |
+          chmod +x dist/alphadrive-linux-amd64
+          ./dist/alphadrive-linux-amd64 --version
+          ALPHADRIVE_LISTEN_ADDRESS="127.0.0.1:18080" ALPHADRIVE_DATA_DIR="$(mktemp -d)" ./dist/alphadrive-linux-amd64 serve &
+          SERVER_PID=$!
+          sleep 2
+          curl -sI http://127.0.0.1:18080/setup | grep -i "content-type: text/html"
+          curl -sI http://127.0.0.1:18080/static/css/app.css | grep -i "content-type: text/css"
+          curl -sI http://127.0.0.1:18080/static/js/app.js | grep -i "content-type:"
+          curl -sI http://127.0.0.1:18080/static/images/logo.png | grep -i "content-type: image/png"
+          CSS_OUT=$(curl -s http://127.0.0.1:18080/static/css/app.css)
+          echo "$CSS_OUT" | grep -F ".auth-page"
+          echo "$CSS_OUT" | grep -F ".auth-shell"
+          echo "$CSS_OUT" | grep -F ".auth-logo"
+          echo "$CSS_OUT" | grep -F ".auth-title"
+          echo "$CSS_OUT" | grep -F ".auth-card"
+          echo "$CSS_OUT" | grep -F ".form-group"
+          echo "$CSS_OUT" | grep -F ".btn-submit"
+          kill $SERVER_PID || true
+
       - name: Generate SHA256 Checksums
         run: |
           cd dist

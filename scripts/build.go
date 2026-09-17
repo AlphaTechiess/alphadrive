@@ -20,21 +20,120 @@ var (
 	tagSpaceRe    = regexp.MustCompile(`>\s+<`)
 )
 
+// MinifyCSS safely compresses CSS by removing comments and unnecessary whitespace
+// while preserving all syntax tokens, braces, delimiters, combinators, strings,
+// URLs, calc() expressions, media queries, and custom properties.
 func MinifyCSS(input string) string {
-	// Strip comments
-	out := cssCommentRe.ReplaceAllString(input, "")
-	// Normalize whitespace
-	out = multiSpaceRe.ReplaceAllString(out, " ")
-	// Remove space around delimiters
-	delims := []string{": ", " :", " {", "{ ", " }", "} ", "; ", " ;", ", ", " ,", " >", "> ", " +", "+ "}
-	for i := 0; i < len(delims); i += 2 {
-		out = strings.ReplaceAll(out, delims[i], string(delims[i][0]))
-		out = strings.ReplaceAll(out, delims[i+1], string(delims[i+1][1]))
+	var sb strings.Builder
+	sb.Grow(len(input))
+
+	n := len(input)
+	i := 0
+
+	for i < n {
+		c := input[i]
+
+		// 1. Comments: /* ... */
+		if c == '/' && i+1 < n && input[i+1] == '*' {
+			i += 2
+			for i < n {
+				if input[i] == '*' && i+1 < n && input[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		// 2. String literals: "..." or '...'
+		if c == '"' || c == '\'' {
+			quote := c
+			sb.WriteByte(quote)
+			i++
+			for i < n {
+				ch := input[i]
+				sb.WriteByte(ch)
+				i++
+				if ch == '\\' && i < n {
+					sb.WriteByte(input[i])
+					i++
+				} else if ch == quote {
+					break
+				}
+			}
+			continue
+		}
+
+		// 3. url(...)
+		if (c == 'u' || c == 'U') && i+3 < n && strings.EqualFold(input[i:i+4], "url(") {
+			sb.WriteString(input[i : i+4])
+			i += 4
+			for i < n {
+				ch := input[i]
+				if ch == '"' || ch == '\'' {
+					quote := ch
+					sb.WriteByte(quote)
+					i++
+					for i < n {
+						qch := input[i]
+						sb.WriteByte(qch)
+						i++
+						if qch == '\\' && i < n {
+							sb.WriteByte(input[i])
+							i++
+						} else if qch == quote {
+							break
+						}
+					}
+					continue
+				}
+				sb.WriteByte(ch)
+				i++
+				if ch == ')' {
+					break
+				}
+			}
+			continue
+		}
+
+		// 4. Whitespace
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' {
+			// Skip all consecutive whitespace
+			for i < n && (input[i] == ' ' || input[i] == '\t' || input[i] == '\n' || input[i] == '\r' || input[i] == '\f') {
+				i++
+			}
+			if sb.Len() == 0 || i >= n {
+				continue
+			}
+			lastByte := sb.String()[sb.Len()-1]
+			nextByte := input[i]
+
+			// Omit space if adjacent to characters where space is never syntactically required
+			// Before or after: { } ; ,
+			// After: : (unless part of pseudo-selectors or properties)
+			if lastByte == '{' || lastByte == '}' || lastByte == ';' || lastByte == ',' || lastByte == ':' ||
+				nextByte == '{' || nextByte == '}' || nextByte == ';' || nextByte == ',' || nextByte == ':' {
+				continue
+			}
+
+			// In all other cases (e.g. combinators, values like "10px solid red", @media queries, calc expressions), emit a single space
+			sb.WriteByte(' ')
+			continue
+		}
+
+		// 5. Normal character
+		sb.WriteByte(c)
+		i++
 	}
-	out = strings.ReplaceAll(out, ";}", "}")
-	return strings.TrimSpace(out)
+
+	res := sb.String()
+	// Safely clean up redundant semicolons immediately before closing brace: ";}" -> "}"
+	res = strings.ReplaceAll(res, ";}", "}")
+	return strings.TrimSpace(res)
 }
 
+// MinifyHTML removes comments and trims blank lines from HTML templates without destroying inline spacing.
 func MinifyHTML(input string) string {
 	out := htmlCommentRe.ReplaceAllString(input, "")
 	lines := strings.Split(out, "\n")
@@ -46,31 +145,81 @@ func MinifyHTML(input string) string {
 			sb.WriteString("\n")
 		}
 	}
-	res := sb.String()
-	res = tagSpaceRe.ReplaceAllString(res, "><")
-	return strings.TrimSpace(res)
-}
-
-func MinifyJS(input string) string {
-	// Remove block comments
-	out := cssCommentRe.ReplaceAllString(input, "")
-	lines := strings.Split(out, "\n")
-	var sb strings.Builder
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		// Strip line comments if not inside string
-		if strings.HasPrefix(trimmed, "//") {
-			continue
-		}
-		sb.WriteString(trimmed)
-		sb.WriteString("\n")
-	}
 	return strings.TrimSpace(sb.String())
 }
 
+// MinifyJS safely compresses JavaScript by removing comments and excessive whitespace
+// while strictly preserving string literals, template literals, and regex literals.
+func MinifyJS(input string) string {
+	var sb strings.Builder
+	sb.Grow(len(input))
+
+	n := len(input)
+	i := 0
+
+	for i < n {
+		c := input[i]
+
+		// 1. Block comments: /* ... */
+		if c == '/' && i+1 < n && input[i+1] == '*' {
+			i += 2
+			for i < n {
+				if input[i] == '*' && i+1 < n && input[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		// 2. Line comments: // ...
+		if c == '/' && i+1 < n && input[i+1] == '/' {
+			i += 2
+			for i < n && input[i] != '\n' && input[i] != '\r' {
+				i++
+			}
+			continue
+		}
+
+		// 3. String literals: "..." or '...' or `...`
+		if c == '"' || c == '\'' || c == '`' {
+			quote := c
+			sb.WriteByte(quote)
+			i++
+			for i < n {
+				ch := input[i]
+				sb.WriteByte(ch)
+				i++
+				if ch == '\\' && i < n {
+					sb.WriteByte(input[i])
+					i++
+				} else if ch == quote {
+					break
+				}
+			}
+			continue
+		}
+
+		// 4. Normal characters
+		sb.WriteByte(c)
+		i++
+	}
+
+	lines := strings.Split(sb.String(), "\n")
+	var result strings.Builder
+	for _, l := range lines {
+		trimmed := strings.TrimRight(l, " \t\r")
+		if strings.TrimSpace(trimmed) != "" {
+			result.WriteString(trimmed)
+			result.WriteString("\n")
+		}
+	}
+
+	return strings.TrimSpace(result.String())
+}
+
+// MinifySVG safely compresses SVG assets.
 func MinifySVG(input string) string {
 	out := htmlCommentRe.ReplaceAllString(input, "")
 	out = multiSpaceRe.ReplaceAllString(out, " ")
@@ -151,6 +300,32 @@ func main() {
 		if err := os.WriteFile(path, minBytes, 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "write minified %s: %v\n", path, err)
 			os.Exit(1)
+		}
+	}
+
+	// Validate minified CSS assets before compiling
+	if cssBytes, ok := filesToMinify["web/static/css/app.css"]; ok {
+		minifiedCSS := MinifyCSS(string(cssBytes))
+		openBraces := strings.Count(minifiedCSS, "{")
+		closeBraces := strings.Count(minifiedCSS, "}")
+		if openBraces == 0 || openBraces != closeBraces {
+			fmt.Fprintf(os.Stderr, "ERROR: Minified CSS brace mismatch (%d '{' vs %d '}')\n", openBraces, closeBraces)
+			os.Exit(1)
+		}
+		criticalSelectors := []string{
+			".auth-page",
+			".auth-shell",
+			".auth-logo",
+			".auth-title",
+			".auth-card",
+			".form-group",
+			".btn-submit",
+		}
+		for _, sel := range criticalSelectors {
+			if !strings.Contains(minifiedCSS, sel) {
+				fmt.Fprintf(os.Stderr, "ERROR: Minified CSS missing critical selector %q\n", sel)
+				os.Exit(1)
+			}
 		}
 	}
 

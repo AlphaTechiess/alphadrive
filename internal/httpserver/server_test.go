@@ -1214,4 +1214,64 @@ func TestHTMLContentTypeRegression(t *testing.T) {
 	if ct := favResp.Header.Get("Content-Type"); ct != "image/png" {
 		t.Fatalf("expected Content-Type image/png for /favicon.ico, got %q", ct)
 	}
+
+	// 7. /static/css/app.css must return text/css and contain all critical auth/setup selectors
+	cssResp, err := http.Get(rig.server.URL + "/static/css/app.css")
+	if err != nil {
+		t.Fatalf("GET /static/css/app.css failed: %v", err)
+	}
+	defer cssResp.Body.Close()
+	if cssResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for /static/css/app.css, got %d", cssResp.StatusCode)
+	}
+	cssCT := cssResp.Header.Get("Content-Type")
+	if !strings.HasPrefix(cssCT, "text/css") {
+		t.Fatalf("expected text/css Content-Type for app.css, got %q", cssCT)
+	}
+	cssBody, err := io.ReadAll(cssResp.Body)
+	if err != nil {
+		t.Fatalf("read css body: %v", err)
+	}
+	cssStr := string(cssBody)
+	criticalSelectors := []string{
+		".auth-page",
+		".auth-shell",
+		".auth-logo",
+		".auth-title",
+		".auth-card",
+		".form-group",
+		".btn-submit",
+	}
+	for _, sel := range criticalSelectors {
+		if !strings.Contains(cssStr, sel) {
+			t.Fatalf("missing critical selector %q in served app.css", sel)
+		}
+	}
+
+	// 8. /static/js/app.js must return javascript MIME
+	jsResp, err := http.Get(rig.server.URL + "/static/js/app.js")
+	if err != nil {
+		t.Fatalf("GET /static/js/app.js failed: %v", err)
+	}
+	defer jsResp.Body.Close()
+	if jsResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for /static/js/app.js, got %d", jsResp.StatusCode)
+	}
+	jsCT := jsResp.Header.Get("Content-Type")
+	if !strings.Contains(jsCT, "javascript") && !strings.Contains(jsCT, "text/plain") {
+		t.Fatalf("expected javascript Content-Type for app.js, got %q", jsCT)
+	}
+
+	// 9. /static/images/logo.png must return image/png
+	imgResp, err := http.Get(rig.server.URL + "/static/images/logo.png")
+	if err != nil {
+		t.Fatalf("GET /static/images/logo.png failed: %v", err)
+	}
+	defer imgResp.Body.Close()
+	if imgResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for /static/images/logo.png, got %d", imgResp.StatusCode)
+	}
+	if ct := imgResp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Fatalf("expected Content-Type image/png for logo.png, got %q", ct)
+	}
 }

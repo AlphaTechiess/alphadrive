@@ -354,6 +354,7 @@ resolve_version() {
 }
 
 download_and_verify() {
+    printf '\n%b[3/7] Downloading release & verifying checksums...%b\n' "$BOLD" "$NC"
     local binary_name="alphadrive-linux-${ARCH}"
     local download_url="https://github.com/${REPO}/releases/download/${RESOLVED_TAG}/${binary_name}"
     local checksums_url="https://github.com/${REPO}/releases/download/${RESOLVED_TAG}/checksums.txt"
@@ -544,7 +545,7 @@ EOF
 }
 
 setup_system() {
-    printf '\n%b[3/7] Installing AlphaDrive binary & data paths...%b\n' "$BOLD" "$NC"
+    printf '\n%b[4/7] Installing AlphaDrive binary & data paths...%b\n' "$BOLD" "$NC"
 
     # Pre-upgrade backup if upgrading
     if [ "${UPGRADE_MODE}" = "true" ] && [ -f /opt/alphadrive/alphadrive ] && [ -d /var/lib/alphadrive/data ]; then
@@ -619,7 +620,7 @@ setup_system() {
         HEALTH_CHECK_IP="127.0.0.1"
     fi
 
-    printf '\n%b[4/7] Configuring environment & systemd service...%b\n' "$BOLD" "$NC"
+    info "Configuring environment & systemd service..."
 
     # Write /etc/alphadrive/alphadrive.env
     if [ ! -f /etc/alphadrive/alphadrive.env ] || [ "${UPGRADE_MODE}" = "false" ]; then
@@ -1018,9 +1019,9 @@ main() {
     check_privileges "$@"
     check_system
     check_existing_install
+    run_wizard
     resolve_version
     download_and_verify
-    run_wizard
     setup_system
     configure_reverse_proxy
     verify_health

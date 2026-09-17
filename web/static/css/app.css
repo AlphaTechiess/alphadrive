@@ -53,8 +53,29 @@ button, input {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 24px 16px;
     position: relative;
+    overflow-x: hidden;
+}
+
+.auth-page::after {
+    content: "";
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 55vw;
+    height: 55vh;
+    min-width: 320px;
+    min-height: 280px;
+    background: linear-gradient(
+        135deg,
+        transparent 0%,
+        transparent 48%,
+        var(--mint-accent) 48.5%,
+        var(--cyan-accent) 100%
+    );
+    pointer-events: none;
+    z-index: 0;
 }
 
 .auth-shell {
@@ -62,54 +83,53 @@ button, input {
     max-width: 360px;
     text-align: center;
     position: relative;
-    z-index: 2;
+    z-index: 1;
 }
 
 .auth-logo {
-    width: 240px;
+    width: 150px;
     height: auto;
-    margin: 0 auto 28px;
+    margin: 0 auto 16px;
     display: block;
 }
 
 .auth-title {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 600;
     color: var(--text-white);
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .auth-card {
     background: var(--bg-card);
     border-radius: 20px;
-    padding: 32px 28px;
+    padding: 24px 22px;
     position: relative;
-    overflow: hidden;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
     text-align: left;
 }
 
 .auth-card .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 14px;
 }
 
 .auth-card label {
     display: block;
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text-white);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .auth-card input {
     width: 100%;
-    height: 44px;
+    height: 42px;
     background: var(--bg-input);
     border-radius: 12px;
     border: 0;
     padding: 0 14px;
     color: var(--text-white);
-    font-size: 16px;
+    font-size: 15px;
     outline: none;
     transition: box-shadow 0.15s;
 }
@@ -120,11 +140,11 @@ button, input {
 
 .btn-submit {
     width: 100%;
-    height: 48px;
+    height: 46px;
     background: var(--bg-active);
     border-radius: 14px;
     color: var(--text-white);
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
     border: 0;
     cursor: pointer;
@@ -137,21 +157,10 @@ button, input {
 }
 
 .auth-error {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     color: #ff7b7b;
     font-size: 14px;
     text-align: center;
-}
-
-.auth-corner-gradient {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 130px;
-    height: 130px;
-    pointer-events: none;
-    background: linear-gradient(135deg, transparent 50%, var(--mint-accent) 50.1%, var(--cyan-accent) 100%);
-    border-bottom-right-radius: 20px;
 }
 
 /* ==========================================================================
@@ -1177,6 +1186,36 @@ button, input {
    ========================================================================== */
 
 @media (max-width: 768px) {
+    .auth-page {
+        padding: 16px 14px;
+    }
+
+    .auth-page::after {
+        width: 65vw;
+        height: 45vh;
+        min-width: 220px;
+        min-height: 200px;
+    }
+
+    .auth-shell {
+        max-width: 100%;
+    }
+
+    .auth-logo {
+        width: 120px;
+        margin-bottom: 12px;
+    }
+
+    .auth-title {
+        font-size: 20px;
+        margin-bottom: 14px;
+    }
+
+    .auth-card {
+        padding: 20px 18px;
+        border-radius: 16px;
+    }
+
     .desktop-header,
     .desktop-sidebar {
         display: none !important;

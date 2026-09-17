@@ -33,11 +33,11 @@ else
     NC=''
 fi
 
-info()    { printf "${BLUE}ℹ${NC} %s\n" "$*"; }
-success() { printf "${GREEN}✓${NC} %s\n" "$*"; }
-warn()    { printf "${YELLOW}⚠${NC} %s\n" "$*"; }
-error()   { printf "${RED}✗${NC} %s\n" "$*" >&2; }
-debug()   { if [ "${DEBUG:-false}" = "true" ]; then printf "${MAGENTA}[DEBUG]${NC} %s\n" "$*" >&2; fi; }
+info()    { printf '%bℹ%b %s\n' "$BLUE" "$NC" "$*"; }
+success() { printf '%b✓%b %s\n' "$GREEN" "$NC" "$*"; }
+warn()    { printf '%b⚠%b %s\n' "$YELLOW" "$NC" "$*"; }
+error()   { printf '%b✗%b %s\n' "$RED" "$NC" "$*" >&2; }
+debug()   { if [ "${DEBUG:-false}" = "true" ]; then printf '%b[DEBUG]%b %s\n' "$MAGENTA" "$NC" "$*" >&2; fi; }
 fatal()   { error "$*"; exit 1; }
 
 # Global constants & variables
@@ -198,7 +198,7 @@ check_privileges() {
 }
 
 check_system() {
-    printf "\n${BOLD}[1/7] Checking system environment...${NC}\n"
+    printf '\n%b[1/7] Checking system environment...%b\n' "$BOLD" "$NC"
 
     # 1. OS check
     if [ ! -f /etc/os-release ]; then
@@ -401,7 +401,7 @@ download_and_verify() {
 }
 
 run_wizard() {
-    printf "\n${BOLD}[2/7] Selecting access mode & networking...${NC}\n"
+    printf '\n%b[2/7] Selecting access mode & networking...%b\n' "$BOLD" "$NC"
 
     # Non-interactive argument validation
     if [ "${NON_INTERACTIVE}" = "true" ]; then
@@ -544,13 +544,14 @@ EOF
 }
 
 setup_system() {
-    printf "\n${BOLD}[3/7] Installing AlphaDrive binary & data paths...${NC}\n"
+    printf '\n%b[3/7] Installing AlphaDrive binary & data paths...%b\n' "$BOLD" "$NC"
 
     # Pre-upgrade backup if upgrading
     if [ "${UPGRADE_MODE}" = "true" ] && [ -f /opt/alphadrive/alphadrive ] && [ -d /var/lib/alphadrive/data ]; then
         info "Creating pre-upgrade atomic backup..."
         mkdir -p /var/backups
-        local backup_file="/var/backups/alphadrive-preupgrade-$(date +%Y%m%d_%H%M%S).tar.gz"
+        local backup_file
+        backup_file="/var/backups/alphadrive-preupgrade-$(date +%Y%m%d_%H%M%S).tar.gz"
         if sudo -u alphadrive ALPHADRIVE_DATA_DIR=/var/lib/alphadrive/data /opt/alphadrive/alphadrive backup --output "${backup_file}" >/dev/null 2>&1; then
             success "Pre-upgrade backup created at: ${backup_file}"
         else
@@ -618,7 +619,7 @@ setup_system() {
         HEALTH_CHECK_IP="127.0.0.1"
     fi
 
-    printf "\n${BOLD}[4/7] Configuring environment & systemd service...${NC}\n"
+    printf '\n%b[4/7] Configuring environment & systemd service...%b\n' "$BOLD" "$NC"
 
     # Write /etc/alphadrive/alphadrive.env
     if [ ! -f /etc/alphadrive/alphadrive.env ] || [ "${UPGRADE_MODE}" = "false" ]; then
@@ -689,7 +690,7 @@ EOF
 }
 
 configure_reverse_proxy() {
-    printf "\n${BOLD}[5/7] Configuring networking & reverse proxy...${NC}\n"
+    printf '\n%b[5/7] Configuring networking & reverse proxy...%b\n' "$BOLD" "$NC"
 
     case "$PROXY" in
         caddy)
@@ -837,10 +838,10 @@ EOF
 }
 
 verify_health() {
-    printf "\n${BOLD}[6/7] Starting AlphaDrive daemon & running health checks...${NC}\n"
+    printf '\n%b[6/7] Starting AlphaDrive daemon & running health checks...%b\n' "$BOLD" "$NC"
     systemctl restart alphadrive
 
-    printf "${BOLD}[7/7] Verifying healthcheck endpoint...${NC}\n"
+    printf '%b[7/7] Verifying healthcheck endpoint...%b\n' "$BOLD" "$NC"
     local health_url="http://${HEALTH_CHECK_IP}:${PORT}/healthz"
     local attempts=0
     local max_attempts=15
@@ -970,27 +971,27 @@ print_completion() {
 
     echo ""
     echo "============================================================"
-    printf "            ${GREEN}${BOLD}AlphaDrive Installation Complete${NC}\n"
+    printf '            %b%bAlphaDrive Installation Complete%b\n' "$GREEN" "$BOLD" "$NC"
     echo "============================================================"
     echo ""
-    printf "Version:      ${BOLD}%s${NC}\n" "${RESOLVED_TAG}"
-    printf "Architecture: ${BOLD}%s${NC}\n" "${ARCH}"
-    printf "Port:         ${BOLD}%s${NC}\n" "${PORT}"
+    printf 'Version:      %b%s%b\n' "$BOLD" "${RESOLVED_TAG}" "$NC"
+    printf 'Architecture: %b%s%b\n' "$BOLD" "${ARCH}" "$NC"
+    printf 'Port:         %b%s%b\n' "$BOLD" "${PORT}" "$NC"
     if [ "$ACCESS_MODE" = "2" ]; then
-        printf "Access Mode:  ${BOLD}Custom Domain + HTTPS (%s)${NC}\n" "${PROXY}"
+        printf 'Access Mode:  %bCustom Domain + HTTPS (%s)%b\n' "$BOLD" "${PROXY}" "$NC"
     elif [ "$ACCESS_MODE" = "3" ]; then
-        printf "Access Mode:  ${BOLD}Local / LAN${NC}\n"
+        printf 'Access Mode:  %bLocal / LAN%b\n' "$BOLD" "$NC"
     else
-        printf "Access Mode:  ${BOLD}VPS IP + Port${NC}\n"
+        printf 'Access Mode:  %bVPS IP + Port%b\n' "$BOLD" "$NC"
     fi
     echo ""
     echo "AlphaDrive URL:"
-    printf "  ${CYAN}${BOLD}%s${NC}\n" "${PUBLIC_URL}"
+    printf '  %b%b%s%b\n' "$CYAN" "$BOLD" "${PUBLIC_URL}" "$NC"
     echo ""
 
     if [ "$is_new_install" = "true" ]; then
         echo "First-time Owner Setup:"
-        printf "  ${GREEN}${BOLD}%s/setup${NC}\n" "${PUBLIC_URL}"
+        printf '  %b%b%s/setup%b\n' "$GREEN" "$BOLD" "${PUBLIC_URL}" "$NC"
         echo ""
     fi
 

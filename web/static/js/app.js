@@ -797,6 +797,7 @@ infoModal?.addEventListener('click', event => {
 const shareModal = document.querySelector('#share-modal');
 const shareActiveState = document.querySelector('#share-active-state');
 const shareCreateForm = document.querySelector('#share-create-form');
+const shareFormError = document.querySelector('#share-form-error');
 const shareLinkInput = document.querySelector('#share-link-input');
 const shareActiveDetails = document.querySelector('#share-active-details');
 const shareCopyBtn = document.querySelector('#share-copy-btn');
@@ -806,6 +807,22 @@ const shareNodeIdInput = document.querySelector('#share-node-id');
 const shareCustomSlugInput = document.querySelector('#share-custom-slug');
 const shareNewPasswordInput = document.querySelector('#share-new-password');
 const shareNewExpirySelect = document.querySelector('#share-new-expiry');
+
+function showShareFormError(msg) {
+    if (shareFormError) {
+        shareFormError.textContent = msg;
+        shareFormError.style.display = 'block';
+    } else {
+        showNotice(msg, true);
+    }
+}
+
+function clearShareFormError() {
+    if (shareFormError) {
+        shareFormError.textContent = '';
+        shareFormError.style.display = 'none';
+    }
+}
 
 async function openSelectedShare() {
     if (selection.size !== 1) return;
@@ -818,6 +835,8 @@ async function openSelectedShare() {
     if (shareNodeIdInput) {
         shareNodeIdInput.value = id;
     }
+
+    clearShareFormError();
 
     // Strictly hide both initially
     if (shareActiveState) {
@@ -892,13 +911,26 @@ shareModal?.addEventListener('click', event => {
 
 shareCreateForm?.addEventListener('submit', async event => {
     event.preventDefault();
+    clearShareFormError();
+
     const nodeId = shareNodeIdInput?.value;
     const customSlug = shareCustomSlugInput?.value?.trim() || undefined;
     const password = shareNewPasswordInput?.value || undefined;
     const expiresIn = shareNewExpirySelect?.value || undefined;
 
-    if (password && password.length < 12) {
-        showNotice('Share password must be at least 12 characters', true);
+    if (customSlug) {
+        if (customSlug.length < 3 || customSlug.length > 64) {
+            showShareFormError('Link slug must be between 3 and 64 characters.');
+            return;
+        }
+        if (!/^[a-z0-9-]+$/.test(customSlug)) {
+            showShareFormError('Link slug can only contain lowercase letters, numbers, and hyphens.');
+            return;
+        }
+    }
+
+    if (password && password.length < 8) {
+        showShareFormError('Share password must be at least 8 characters.');
         return;
     }
 
@@ -948,7 +980,7 @@ shareCreateForm?.addEventListener('submit', async event => {
             // Clipboard write might fail if permissions not granted
         }
     } catch (err) {
-        showNotice(err.message, true);
+        showShareFormError(err.message || 'Failed to create share link.');
     }
 });
 
@@ -1115,8 +1147,8 @@ formChangePassword?.addEventListener('submit', async event => {
         showAccountNotice('Current password is required', true);
         return;
     }
-    if (newPassword.length < 12) {
-        showAccountNotice('New password must be at least 12 characters', true);
+    if (newPassword.length < 8) {
+        showAccountNotice('New password must be at least 8 characters', true);
         return;
     }
     if (newPassword !== confirmPassword) {
@@ -1153,8 +1185,8 @@ formAddUser?.addEventListener('submit', async event => {
         showAccountNotice('Username is required', true);
         return;
     }
-    if (password.length < 12) {
-        showAccountNotice('Password must be at least 12 characters', true);
+    if (password.length < 8) {
+        showAccountNotice('Password must be at least 8 characters', true);
         return;
     }
 

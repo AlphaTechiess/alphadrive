@@ -54,8 +54,8 @@ func (a *App) CreateUser(ctx context.Context, username, password string, admin b
 }
 
 func (a *App) CreateUserWithName(ctx context.Context, name, username, password string, admin bool) error {
-	if len(password) < 12 {
-		return fmt.Errorf("password must be at least 12 characters")
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
 	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {
@@ -65,8 +65,8 @@ func (a *App) CreateUserWithName(ctx context.Context, name, username, password s
 }
 
 func (a *App) ResetPassword(ctx context.Context, username, password string) error {
-	if len(password) < 12 {
-		return fmt.Errorf("password must be at least 12 characters")
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
 	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {

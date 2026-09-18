@@ -126,10 +126,10 @@ func TestSharePasswordAndGrants(t *testing.T) {
 		t.Fatalf("upload file: %v", err)
 	}
 
-	// Reject short share password (<12 chars)
-	_, err = ss.Create(ctx, userID, file.ID, "short-pwd", "too-short", nil)
+	// Reject short share password (<8 chars)
+	_, err = ss.Create(ctx, userID, file.ID, "short-pwd", "short", nil)
 	if err == nil {
-		t.Fatal("expected error for short share password (<12 chars), got nil")
+		t.Fatal("expected error for short share password (<8 chars), got nil")
 	}
 
 	// Create share with 12+ char password and future expiration

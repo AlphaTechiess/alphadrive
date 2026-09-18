@@ -260,13 +260,14 @@
             <!-- Create Share Form State -->
             <form id="share-create-form" class="share-create-form">
                 <input type="hidden" id="share-node-id" value="">
+                <div id="share-form-error" class="share-form-error" style="display: none;"></div>
                 <div class="form-group">
                     <label for="share-custom-slug" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Custom link slug (optional)</label>
                     <input id="share-custom-slug" type="text" placeholder="e.g. project-docs" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
                 </div>
                 <div class="form-group">
-                    <label for="share-new-password" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Protect with password (optional, min 12 chars)</label>
-                    <input id="share-new-password" type="password" minlength="12" placeholder="Leave empty for public or min 12 chars" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
+                    <label for="share-new-password" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Protect with password (optional, min 8 chars)</label>
+                    <input id="share-new-password" type="password" minlength="8" placeholder="Leave empty for public or min 8 chars" style="width: 100%; height: 40px; background: var(--bg-input); border: 0; border-radius: 12px; padding: 0 12px; color: #fff; font-size: 14px;">
                 </div>
                 <div class="form-group">
                     <label for="share-new-expiry" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Expires after (optional)</label>
@@ -333,12 +334,12 @@
                     <input id="settings-current-password" type="password" placeholder="Enter current password" required>
                 </div>
                 <div class="form-group">
-                    <label for="settings-new-password">New Password (min 12 chars)</label>
-                    <input id="settings-new-password" type="password" placeholder="At least 12 characters" required minlength="12">
+                    <label for="settings-new-password">New Password (min 8 chars)</label>
+                    <input id="settings-new-password" type="password" placeholder="At least 8 characters" required minlength="8">
                 </div>
                 <div class="form-group">
                     <label for="settings-confirm-password">Confirm New Password</label>
-                    <input id="settings-confirm-password" type="password" placeholder="Repeat new password" required minlength="12">
+                    <input id="settings-confirm-password" type="password" placeholder="Repeat new password" required minlength="8">
                 </div>
                 <button type="submit" class="btn-submit">Update Password</button>
             </form>
@@ -354,8 +355,8 @@
                     <input id="newuser-username" type="text" placeholder="e.g. jdoe" required minlength="3" maxlength="32">
                 </div>
                 <div class="form-group">
-                    <label for="newuser-password">Password (min 12 chars)</label>
-                    <input id="newuser-password" type="password" placeholder="At least 12 characters" required minlength="12">
+                    <label for="newuser-password">Password (min 8 chars)</label>
+                    <input id="newuser-password" type="password" placeholder="At least 8 characters" required minlength="8">
                 </div>
                 <div class="form-group checkbox-group">
                     <label class="checkbox-label" for="newuser-is-admin">

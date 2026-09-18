@@ -263,8 +263,8 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(password) < 12 {
-		s.renderSetup(w, r, "Password must be at least 12 characters long.", name, username, http.StatusBadRequest)
+	if len(password) < 8 {
+		s.renderSetup(w, r, "Password must be at least 8 characters long.", name, username, http.StatusBadRequest)
 		return
 	}
 	if confirmPassword != "" && password != confirmPassword {
@@ -768,8 +768,8 @@ func (s *Server) updatePassword(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if len(input.NewPassword) < 12 {
-		apiError(w, http.StatusBadRequest, "invalid_password", "New password must be at least 12 characters long.")
+	if len(input.NewPassword) < 8 {
+		apiError(w, http.StatusBadRequest, "invalid_password", "New password must be at least 8 characters long.")
 		return
 	}
 
@@ -846,8 +846,8 @@ func (s *Server) addUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(password) < 12 {
-		apiError(w, http.StatusBadRequest, "invalid_password", "Password must be at least 12 characters long.")
+	if len(password) < 8 {
+		apiError(w, http.StatusBadRequest, "invalid_password", "Password must be at least 8 characters long.")
 		return
 	}
 

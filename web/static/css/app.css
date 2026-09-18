@@ -66,6 +66,17 @@ button, input {
     display: none !important;
 }
 
+.share-form-error {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+    background: rgba(255, 92, 92, 0.12);
+    border: 1px solid #ff5c5c;
+    color: #ff7b7b;
+}
+
 /* ==========================================================================
    Auth / Login Screen
    ========================================================================== */

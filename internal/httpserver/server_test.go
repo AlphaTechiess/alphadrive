@@ -933,9 +933,9 @@ func TestOwnerSetupFlow(t *testing.T) {
 		t.Fatalf("expected 400 on mismatched password, got %d", resp.StatusCode)
 	}
 
-	// 4. POST /setup with password < 12 chars should return 400
-	form.Set("password", "shortpass")
-	form.Set("confirm_password", "shortpass")
+	// 4. POST /setup with password < 8 chars should return 400
+	form.Set("password", "short")
+	form.Set("confirm_password", "short")
 	resp, err = client.PostForm(rig.server.URL+"/setup", form)
 	if err != nil {
 		t.Fatalf("post /setup: %v", err)
@@ -1059,7 +1059,7 @@ func TestAccountSettingsAPI(t *testing.T) {
 	// 2b. New password too short
 	status = normalClient.doJSON(t, "POST", rig.server.URL+"/api/account/password", map[string]string{
 		"current_password": userPass,
-		"new_password":     "short123",
+		"new_password":     "short",
 	}, nil)
 	if status != http.StatusBadRequest {
 		t.Fatalf("expected 400 for short new password, got %d", status)

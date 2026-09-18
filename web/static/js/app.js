@@ -88,6 +88,7 @@ function formatDate(dateStr) {
 function iconFor(node) {
     if (node.kind === 'folder') return 'folder.svg';
     const name = (node.name || '').toLowerCase();
+    if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
     if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
     if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
     if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';
@@ -617,8 +618,21 @@ document.addEventListener('click', event => {
     if (!isCard && !isBar && !isMenu && !isFab && !isDialog) {
         selection.clear();
         updateSelectionBar();
+        closeUploadMenu();
     }
 });
+
+function closeUploadMenu() {
+    if (uploadMenu) uploadMenu.hidden = true;
+    uploadFab?.classList.remove('is-open');
+}
+
+function toggleUploadMenu() {
+    if (!uploadMenu) return;
+    const isOpening = uploadMenu.hidden;
+    uploadMenu.hidden = !isOpening;
+    uploadFab?.classList.toggle('is-open', isOpening);
+}
 
 // Create folder
 document.querySelector('#new-folder')?.addEventListener('click', async () => {
@@ -630,7 +644,7 @@ document.querySelector('#new-folder')?.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parent_id: currentParentId, name: name.trim() }),
         });
-        if (uploadMenu) uploadMenu.hidden = true;
+        closeUploadMenu();
         showNotice(`Created folder "${name.trim()}"`);
         loadFolder(currentParentId);
     } catch (error) {
@@ -639,9 +653,7 @@ document.querySelector('#new-folder')?.addEventListener('click', async () => {
 });
 
 // Upload FAB toggle
-uploadFab?.addEventListener('click', () => {
-    if (uploadMenu) uploadMenu.hidden = !uploadMenu.hidden;
-});
+uploadFab?.addEventListener('click', toggleUploadMenu);
 
 // Upload Progress Sidebar Elements & Queue State
 const uploadProgressPanel = document.querySelector('#upload-progress-panel');
@@ -657,6 +669,7 @@ let isUploading = false;
 
 function iconForFilename(name) {
     name = (name || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'pdf.svg';
     if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
     if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
     if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';
@@ -880,7 +893,7 @@ document.querySelector('#upload')?.addEventListener('change', event => {
     if (!filesToUpload.length) return;
     enqueueFiles(filesToUpload, currentParentId);
     event.target.value = '';
-    if (uploadMenu) uploadMenu.hidden = true;
+    closeUploadMenu();
 });
 
 // Folder upload trigger
@@ -889,7 +902,7 @@ document.querySelector('#upload-folder')?.addEventListener('change', event => {
     if (!filesToUpload.length) return;
     enqueueFiles(filesToUpload, currentParentId);
     event.target.value = '';
-    if (uploadMenu) uploadMenu.hidden = true;
+    closeUploadMenu();
 });
 
 async function downloadNodes(ids) {
@@ -1107,7 +1120,6 @@ async function openSelectedShare() {
             if (shareLinkInput) shareLinkInput.value = publicUrl;
             if (shareActiveDetails) {
                 const parts = [
-                    `Views: ${sh.view_count || 0}`,
                     sh.expires_at ? `Expires: ${formatDate(sh.expires_at)}` : 'Never expires',
                 ];
                 if (sh.has_password) parts.push('Password protected');

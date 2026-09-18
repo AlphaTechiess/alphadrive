@@ -686,7 +686,9 @@ func (s *Server) viewFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	mimeType := n.MIMEType
-	if mimeType == "" {
+	if strings.HasSuffix(strings.ToLower(n.Name), ".pdf") {
+		mimeType = "application/pdf"
+	} else if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
 	w.Header().Set("Content-Type", mimeType)
@@ -1367,8 +1369,6 @@ func (s *Server) publicSharePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = s.shares.IncrementViews(r.Context(), sh.ID)
-
 	if sh.HasPassword && !s.hasShareAccess(r, sh) {
 		s.renderPublic(w, r, "password", sh, "", http.StatusOK)
 		return
@@ -1595,6 +1595,9 @@ func iconForFilename(name, kind string) string {
 		return "folder.svg"
 	}
 	n := strings.ToLower(name)
+	if strings.HasSuffix(n, ".pdf") {
+		return "pdf.svg"
+	}
 	if isImgExt(n) {
 		return "image.svg"
 	}

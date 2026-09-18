@@ -59,6 +59,7 @@ function formatDate(dateStr) {
 function iconFor(node) {
     if (node.kind === 'folder') return 'folder.svg';
     const name = (node.name || '').toLowerCase();
+    if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
     if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
     if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
     if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';

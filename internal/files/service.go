@@ -285,7 +285,11 @@ func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id str
 	t := now()
 	mt := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
 	if mt == "" {
-		mt = "application/octet-stream"
+		if strings.ToLower(filepath.Ext(filename)) == ".pdf" {
+			mt = "application/pdf"
+		} else {
+			mt = "application/octet-stream"
+		}
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO nodes(id,user_id,parent_id,kind,name,storage_key,mime_type,size_bytes,created_at,updated_at) VALUES(?,?,?,'file',?,?,?,?,?,?)`, id, userID, parentID, filename, storageKey, mt, written, t, t)
 	if err != nil {

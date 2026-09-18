@@ -192,6 +192,12 @@ func (s *Service) Create(ctx context.Context, userID, nodeID, customSlug, passwo
 		expUnix = sql.NullInt64{Int64: expiresAt.Unix(), Valid: true}
 	}
 
+	// Revoke any prior active shares for this node by this user so only 1 active share exists
+	_, _ = s.db.ExecContext(ctx, `
+		UPDATE shares SET revoked_at=unixepoch(), updated_at=unixepoch()
+		WHERE user_id=? AND node_id=? AND revoked_at IS NULL
+	`, userID, nodeID)
+
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO shares(id, user_id, node_id, slug, password_hash, expires_at, created_at, updated_at)
 		VALUES(?,?,?,?,?,?,?,?)

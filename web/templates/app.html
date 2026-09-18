@@ -85,11 +85,14 @@
             </div>
         </div>
 
-        <!-- Breadcrumbs Navigation -->
+        <!-- Breadcrumbs Navigation & Trash Actions -->
         <div class="breadcrumbs-container">
             <nav id="breadcrumbs" class="drive-breadcrumbs" aria-label="Breadcrumb"></nav>
-            <button id="download-all-btn" class="download-all-btn" type="button" hidden>Download all</button>
+            <button id="empty-trash-btn" class="download-all-btn empty-trash-btn" type="button" hidden>Empty trash</button>
         </div>
+
+        <!-- Marquee Drag Selection Box -->
+        <div id="selection-marquee" class="selection-marquee" hidden></div>
 
         <div id="notice" class="drive-notice" hidden></div>
 
@@ -144,6 +147,30 @@
         <button id="trash-info-selected" class="action-btn action-info" type="button" aria-label="Item details" title="Item details">
             <img src="/static/images/info.svg" alt="">
         </button>
+    </aside>
+
+    <!-- Right-side Upload Progress Sidebar / Panel -->
+    <aside id="upload-progress-panel" class="upload-progress-panel" hidden aria-label="Upload Progress">
+        <div class="upload-progress-header">
+            <div class="upload-progress-title-wrap">
+                <span id="upload-progress-title" class="upload-progress-title">Uploading files</span>
+                <span id="upload-progress-summary" class="upload-progress-summary">0%</span>
+            </div>
+            <div class="upload-progress-actions">
+                <button id="upload-progress-minimize" type="button" class="upload-panel-btn" title="Minimize" aria-label="Minimize">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+                <button id="upload-progress-close" type="button" class="upload-panel-btn" title="Close" aria-label="Close">&times;</button>
+            </div>
+        </div>
+        <div class="upload-overall-track">
+            <div id="upload-overall-fill" class="upload-overall-fill" style="width: 0%;"></div>
+        </div>
+        <div id="upload-progress-body" class="upload-progress-body">
+            <ul id="upload-progress-list" class="upload-progress-list"></ul>
+        </div>
     </aside>
 
     <!-- Upload Floating Action Button (FAB) -->

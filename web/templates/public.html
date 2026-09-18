@@ -17,9 +17,7 @@
             <img src="/static/images/logo.png" alt="alphadrive" class="public-logo">
             <span class="public-brand-text">alphadrive</span>
         </a>
-        {{if eq .State "file"}}
-            <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="download-all-btn public-header-action" download>Download file</a>
-        {{else if eq .State "folder"}}
+        {{if eq .State "folder"}}
             <button id="public-download-all-top" class="download-all-btn public-header-action" type="button">Download all</button>
         {{end}}
     </header>
@@ -67,8 +65,11 @@
                 <img src="/static/images/{{.FileIcon}}" alt="" class="preview-type-icon">
                 <h1 class="public-file-title">{{.Share.NodeName}}</h1>
                 <span class="public-file-size">{{.FormattedSize}}</span>
+                <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="preview-download-link" title="Download {{.Share.NodeName}}" download>
+                    <img src="/static/images/download.svg" alt="Download">
+                </a>
             </div>
-            <div id="public-preview-content" class="public-preview-container">
+            <div id="public-preview-content" class="public-preview-container" style="margin-bottom: 0;">
                 {{if .IsImage}}
                     <img src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" alt="{{.Share.NodeName}}" class="preview-media">
                 {{else if .IsVideo}}
@@ -91,9 +92,6 @@
                         <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" download class="btn-submit preview-download-cta">Download File</a>
                     </div>
                 {{end}}
-            </div>
-            <div class="public-file-footer">
-                <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" class="btn-submit" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; width: auto; padding: 0 36px;" download>Download ({{.FormattedSize}})</a>
             </div>
         </div>
     </main>

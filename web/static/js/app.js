@@ -162,21 +162,19 @@ async function updateStorageQuota() {
 }
 
 function renderBreadcrumbs() {
-    const downloadAllBtn = document.querySelector('#download-all-btn');
+    const emptyTrashBtn = document.querySelector('#empty-trash-btn');
     if (currentView === 'trash') {
         if (breadcrumbsEl) breadcrumbsEl.innerHTML = '<span class="breadcrumb-btn active">Trash</span>';
-        if (downloadAllBtn) downloadAllBtn.hidden = true;
+        if (emptyTrashBtn) {
+            emptyTrashBtn.hidden = nodes.length === 0;
+        }
         return;
     }
+    if (emptyTrashBtn) emptyTrashBtn.hidden = true;
 
     if (!breadcrumbs || breadcrumbs.length <= 1) {
         if (breadcrumbsEl) breadcrumbsEl.innerHTML = '';
-        if (downloadAllBtn) downloadAllBtn.hidden = true;
         return;
-    }
-
-    if (downloadAllBtn) {
-        downloadAllBtn.hidden = nodes.length === 0;
     }
 
     const html = breadcrumbs.map((crumb, idx) => {
@@ -225,6 +223,11 @@ function renderGrid() {
     const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
     const visible = nodes.filter(node => (node.name || '').toLowerCase().includes(query));
 
+    const emptyTrashBtn = document.querySelector('#empty-trash-btn');
+    if (currentView === 'trash' && emptyTrashBtn) {
+        emptyTrashBtn.hidden = nodes.length === 0;
+    }
+
     if (!visible.length) {
         list.innerHTML = query
             ? '<p class="grid-status">No items match your search.</p>'
@@ -245,11 +248,14 @@ function renderGrid() {
     updateSelectionBar();
 }
 
-async function loadFolder(id = '') {
+async function loadFolder(id = '', pushState = true) {
     currentView = 'drive';
     currentParentId = id;
     selection.clear();
     updateNavState();
+    if (pushState && window.location.pathname !== '/') {
+        history.pushState(null, '', '/');
+    }
     if (uploadFab) uploadFab.hidden = false;
     list.innerHTML = '<p class="grid-status">Loading files…</p>';
 
@@ -267,10 +273,13 @@ async function loadFolder(id = '') {
     }
 }
 
-async function loadTrash() {
+async function loadTrash(pushState = true) {
     currentView = 'trash';
     selection.clear();
     updateNavState();
+    if (pushState && window.location.pathname !== '/trash') {
+        history.pushState(null, '', '/trash');
+    }
     if (uploadFab) uploadFab.hidden = true;
     if (uploadMenu) uploadMenu.hidden = true;
     renderBreadcrumbs();
@@ -279,6 +288,7 @@ async function loadTrash() {
     try {
         const data = await api('/api/trash');
         nodes = data.nodes || [];
+        renderBreadcrumbs();
         renderGrid();
         updateStorageQuota();
     } catch (error) {
@@ -297,10 +307,25 @@ function updateNavState() {
 }
 
 // Nav clicks
-document.querySelector('#nav-drive')?.addEventListener('click', () => loadFolder(''));
-document.querySelector('#nav-trash')?.addEventListener('click', () => loadTrash());
-document.querySelector('#mobile-nav-drive')?.addEventListener('click', () => loadFolder(''));
-document.querySelector('#mobile-nav-trash')?.addEventListener('click', () => loadTrash());
+document.querySelector('#nav-drive')?.addEventListener('click', () => loadFolder('', true));
+document.querySelector('#nav-trash')?.addEventListener('click', () => loadTrash(true));
+document.querySelector('#mobile-nav-drive')?.addEventListener('click', () => loadFolder('', true));
+document.querySelector('#mobile-nav-trash')?.addEventListener('click', () => loadTrash(true));
+
+// Empty trash button click
+document.querySelector('#empty-trash-btn')?.addEventListener('click', async () => {
+    if (!nodes.length) return;
+    if (!confirm('Permanently delete all items in trash? This action cannot be undone.')) {
+        return;
+    }
+    try {
+        await api('/api/trash/empty', { method: 'POST' });
+        showNotice('Trash emptied');
+        loadTrash(false);
+    } catch (err) {
+        showNotice(err.message, true);
+    }
+});
 
 // Breadcrumb clicks
 breadcrumbsEl?.addEventListener('click', event => {
@@ -377,54 +402,253 @@ uploadFab?.addEventListener('click', () => {
     if (uploadMenu) uploadMenu.hidden = !uploadMenu.hidden;
 });
 
-// File upload
-document.querySelector('#upload')?.addEventListener('change', async event => {
-    const filesToUpload = Array.from(event.target.files);
-    if (!filesToUpload.length) return;
+// Upload Progress Sidebar Elements & Queue State
+const uploadProgressPanel = document.querySelector('#upload-progress-panel');
+const uploadProgressTitle = document.querySelector('#upload-progress-title');
+const uploadProgressSummary = document.querySelector('#upload-progress-summary');
+const uploadOverallFill = document.querySelector('#upload-overall-fill');
+const uploadProgressList = document.querySelector('#upload-progress-list');
+const uploadProgressMinimize = document.querySelector('#upload-progress-minimize');
+const uploadProgressClose = document.querySelector('#upload-progress-close');
 
-    let successCount = 0;
-    for (const file of filesToUpload) {
+let uploadQueue = [];
+let isUploading = false;
+
+function iconForFilename(name) {
+    name = (name || '').toLowerCase();
+    if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico)$/.test(name)) return 'image.svg';
+    return 'files.svg';
+}
+
+function uploadWithXHR(file, parentId, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
         const form = new FormData();
-        form.set('parent_id', currentParentId);
+        form.set('parent_id', parentId);
         form.set('file', file);
-        try {
-            await api('/api/uploads', { method: 'POST', body: form });
-            successCount++;
-        } catch (error) {
-            showNotice(`Failed to upload ${file.name}: ${error.message}`, true);
+
+        xhr.open('POST', '/api/uploads', true);
+        if (csrf) {
+            xhr.setRequestHeader('X-CSRF-Token', csrf);
+        }
+
+        xhr.upload.onprogress = event => {
+            if (event.lengthComputable && onProgress) {
+                onProgress(event.loaded, event.total);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    resolve(data);
+                } catch {
+                    resolve({});
+                }
+            } else {
+                let msg = `Upload failed (${xhr.status})`;
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data?.error?.message) msg = data.error.message;
+                } catch {}
+                reject(new Error(msg));
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Network error during upload'));
+        };
+
+        xhr.ontimeout = () => {
+            reject(new Error('Upload timed out'));
+        };
+
+        xhr.send(form);
+    });
+}
+
+function renderUploadQueue() {
+    if (!uploadProgressList) return;
+    uploadProgressList.innerHTML = '';
+
+    let totalBytes = 0;
+    let loadedBytes = 0;
+    let completedCount = 0;
+    let errorCount = 0;
+
+    uploadQueue.forEach(item => {
+        const itemSize = item.total || item.file.size || 1;
+        totalBytes += itemSize;
+        loadedBytes += item.loaded || 0;
+        if (item.status === 'completed') completedCount++;
+        if (item.status === 'error') errorCount++;
+
+        const pct = item.total > 0 ? Math.min(100, Math.round((item.loaded / item.total) * 100)) : 0;
+        const icon = iconForFilename(item.file.name);
+
+        const li = document.createElement('li');
+        li.className = 'upload-item-row';
+        li.id = `upload-row-${item.id}`;
+
+        let statusHtml = '';
+        let fillClass = '';
+        if (item.status === 'uploading') {
+            statusHtml = `<span class="upload-item-status">${pct}%</span>`;
+        } else if (item.status === 'completed') {
+            statusHtml = `<span class="upload-item-status status-complete">✓ Done</span>`;
+            fillClass = 'complete';
+        } else if (item.status === 'error') {
+            statusHtml = `<span class="upload-item-status status-error" title="${esc(item.errorMsg || 'Failed')}">✕ Failed</span>`;
+            fillClass = 'error';
+        } else {
+            statusHtml = `<span class="upload-item-status">Queued</span>`;
+        }
+
+        li.innerHTML = `
+            <div class="upload-item-main">
+                <div class="upload-item-info">
+                    <img src="/static/images/${icon}" alt="" class="upload-item-icon">
+                    <span class="upload-item-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
+                </div>
+                ${statusHtml}
+            </div>
+            <div class="upload-item-track">
+                <div class="upload-item-fill ${fillClass}" style="width: ${item.status === 'completed' ? '100' : pct}%;"></div>
+            </div>
+        `;
+        uploadProgressList.appendChild(li);
+    });
+
+    const overallPct = totalBytes > 0 ? Math.min(100, Math.round((loadedBytes / totalBytes) * 100)) : 0;
+    if (uploadOverallFill) {
+        uploadOverallFill.style.width = `${overallPct}%`;
+    }
+
+    const totalCount = uploadQueue.length;
+    if (completedCount + errorCount === totalCount && totalCount > 0) {
+        if (uploadProgressTitle) {
+            uploadProgressTitle.textContent = errorCount > 0 
+                ? `Upload complete (${completedCount} done, ${errorCount} failed)`
+                : `Upload complete (${totalCount} file${totalCount > 1 ? 's' : ''})`;
+        }
+        if (uploadProgressSummary) {
+            uploadProgressSummary.textContent = `${overallPct}%`;
+        }
+    } else if (totalCount > 0) {
+        if (uploadProgressTitle) {
+            uploadProgressTitle.textContent = `Uploading ${completedCount + 1} of ${totalCount} file${totalCount > 1 ? 's' : ''}`;
+        }
+        if (uploadProgressSummary) {
+            uploadProgressSummary.textContent = `${overallPct}% (${formatBytes(loadedBytes)} of ${formatBytes(totalBytes)})`;
         }
     }
-    event.target.value = '';
-    if (uploadMenu) uploadMenu.hidden = true;
-    if (successCount > 0) {
-        showNotice(`Uploaded ${successCount} file(s)`);
+}
+
+async function processUploadQueue() {
+    if (isUploading) return;
+    isUploading = true;
+
+    while (true) {
+        const nextItem = uploadQueue.find(it => it.status === 'pending');
+        if (!nextItem) break;
+
+        nextItem.status = 'uploading';
+        renderUploadQueue();
+
+        try {
+            await uploadWithXHR(nextItem.file, nextItem.parentId, (loaded, total) => {
+                nextItem.loaded = loaded;
+                nextItem.total = total;
+                const row = document.getElementById(`upload-row-${nextItem.id}`);
+                if (row) {
+                    const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+                    const statusEl = row.querySelector('.upload-item-status');
+                    const fillEl = row.querySelector('.upload-item-fill');
+                    if (statusEl) statusEl.textContent = `${pct}%`;
+                    if (fillEl) fillEl.style.width = `${pct}%`;
+                }
+                let allTotal = 0;
+                let allLoaded = 0;
+                uploadQueue.forEach(it => {
+                    allTotal += it.total || it.file.size || 1;
+                    allLoaded += it.loaded || 0;
+                });
+                const overallPct = allTotal > 0 ? Math.min(100, Math.round((allLoaded / allTotal) * 100)) : 0;
+                if (uploadOverallFill) uploadOverallFill.style.width = `${overallPct}%`;
+                if (uploadProgressSummary) {
+                    uploadProgressSummary.textContent = `${overallPct}% (${formatBytes(allLoaded)} of ${formatBytes(allTotal)})`;
+                }
+            });
+
+            nextItem.status = 'completed';
+            nextItem.loaded = nextItem.total || nextItem.file.size;
+        } catch (err) {
+            nextItem.status = 'error';
+            nextItem.errorMsg = err.message || 'Upload failed';
+        }
+
+        renderUploadQueue();
+        loadFolder(currentParentId);
+        updateStorageQuota();
     }
-    loadFolder(currentParentId);
+
+    isUploading = false;
+}
+
+function enqueueFiles(filesList, parentId) {
+    if (!filesList || !filesList.length) return;
+
+    if (uploadProgressPanel) {
+        uploadProgressPanel.hidden = false;
+        uploadProgressPanel.classList.remove('collapsed');
+    }
+
+    for (const file of filesList) {
+        uploadQueue.push({
+            id: 'up_' + Math.random().toString(36).slice(2, 9),
+            file: file,
+            parentId: parentId,
+            loaded: 0,
+            total: file.size || 0,
+            status: 'pending',
+            errorMsg: '',
+        });
+    }
+
+    renderUploadQueue();
+    processUploadQueue();
+}
+
+uploadProgressMinimize?.addEventListener('click', () => {
+    uploadProgressPanel?.classList.toggle('collapsed');
 });
 
-// Folder upload
-document.querySelector('#upload-folder')?.addEventListener('change', async event => {
+uploadProgressClose?.addEventListener('click', () => {
+    if (uploadProgressPanel) {
+        uploadProgressPanel.hidden = true;
+    }
+});
+
+// File upload trigger
+document.querySelector('#upload')?.addEventListener('change', event => {
     const filesToUpload = Array.from(event.target.files);
     if (!filesToUpload.length) return;
-
-    let successCount = 0;
-    for (const file of filesToUpload) {
-        const form = new FormData();
-        form.set('parent_id', currentParentId);
-        form.set('file', file);
-        try {
-            await api('/api/uploads', { method: 'POST', body: form });
-            successCount++;
-        } catch (error) {
-            showNotice(`Failed to upload ${file.name}: ${error.message}`, true);
-        }
-    }
+    enqueueFiles(filesToUpload, currentParentId);
     event.target.value = '';
     if (uploadMenu) uploadMenu.hidden = true;
-    if (successCount > 0) {
-        showNotice(`Uploaded ${successCount} file(s) from folder`);
-    }
-    loadFolder(currentParentId);
+});
+
+// Folder upload trigger
+document.querySelector('#upload-folder')?.addEventListener('change', event => {
+    const filesToUpload = Array.from(event.target.files);
+    if (!filesToUpload.length) return;
+    enqueueFiles(filesToUpload, currentParentId);
+    event.target.value = '';
+    if (uploadMenu) uploadMenu.hidden = true;
 });
 
 async function downloadNodes(ids) {
@@ -470,12 +694,6 @@ async function downloadNodes(ids) {
 document.querySelector('#download-selected')?.addEventListener('click', () => {
     if (selection.size === 0) return;
     downloadNodes(Array.from(selection));
-});
-
-// Download all in current folder
-document.querySelector('#download-all-btn')?.addEventListener('click', () => {
-    if (!nodes.length) return;
-    downloadNodes(nodes.map(n => n.id));
 });
 
 // Trash selected
@@ -601,25 +819,34 @@ async function openSelectedShare() {
         shareNodeIdInput.value = id;
     }
 
-    // Check if an active share already exists
+    // Hide both initially to avoid flashing the wrong state
+    if (shareActiveState) shareActiveState.hidden = true;
+    if (shareCreateForm) shareCreateForm.hidden = true;
+
+    // Check if an active share already exists in DB
     try {
-        const share = await api(`/api/nodes/${encodeURIComponent(id)}/share`);
-        if (share && share.slug) {
+        const res = await api(`/api/nodes/${encodeURIComponent(id)}/share`);
+        const sh = (res && (res.share || res)) || {};
+        const slug = sh.slug || res.slug;
+        if (slug) {
+            const publicUrl = res.public_url || `${window.location.origin}/s/${slug}`;
             if (shareActiveState) shareActiveState.hidden = false;
             if (shareCreateForm) shareCreateForm.hidden = true;
-            if (shareLinkInput) shareLinkInput.value = share.public_url || `${window.location.origin}/s/${share.slug}`;
+            if (shareLinkInput) shareLinkInput.value = publicUrl;
             if (shareActiveDetails) {
                 const parts = [
-                    `Views: ${share.view_count || 0}`,
-                    share.expires_at ? `Expires: ${formatDate(share.expires_at)}` : 'Never expires',
+                    `Views: ${sh.view_count || 0}`,
+                    sh.expires_at ? `Expires: ${formatDate(sh.expires_at)}` : 'Never expires',
                 ];
-                if (share.has_password) parts.push('Password protected');
+                if (sh.has_password) parts.push('Password protected');
                 shareActiveDetails.textContent = parts.join(' • ');
             }
-            if (shareRevokeBtn) shareRevokeBtn.dataset.shareId = share.id;
+            if (shareRevokeBtn) shareRevokeBtn.dataset.shareId = sh.id || res.id;
             if (shareOpenBtn) {
-                shareOpenBtn.onclick = () => window.open(share.public_url || `/s/${share.slug}`, '_blank');
+                shareOpenBtn.onclick = () => window.open(publicUrl, '_blank');
             }
+        } else {
+            throw new Error('No active share');
         }
     } catch (e) {
         // No active share found, show create form
@@ -660,7 +887,7 @@ shareCreateForm?.addEventListener('submit', async event => {
     }
 
     try {
-        const result = await api('/api/shares', {
+        const res = await api('/api/shares', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -671,20 +898,24 @@ shareCreateForm?.addEventListener('submit', async event => {
             }),
         });
 
+        const sh = (res && (res.share || res)) || {};
+        const slug = sh.slug || res.slug;
+        const publicUrl = res.public_url || `${window.location.origin}/s/${slug}`;
+
         if (shareActiveState) shareActiveState.hidden = false;
         if (shareCreateForm) shareCreateForm.hidden = true;
-        if (shareLinkInput) shareLinkInput.value = result.public_url || `${window.location.origin}/s/${result.slug}`;
+        if (shareLinkInput) shareLinkInput.value = publicUrl;
         if (shareActiveDetails) {
             const parts = [
                 'Views: 0',
-                result.expires_at ? `Expires: ${formatDate(result.expires_at)}` : 'Never expires',
+                sh.expires_at ? `Expires: ${formatDate(sh.expires_at)}` : 'Never expires',
             ];
-            if (result.has_password) parts.push('Password protected');
+            if (sh.has_password) parts.push('Password protected');
             shareActiveDetails.textContent = parts.join(' • ');
         }
-        if (shareRevokeBtn) shareRevokeBtn.dataset.shareId = result.id;
+        if (shareRevokeBtn) shareRevokeBtn.dataset.shareId = sh.id || res.id;
         if (shareOpenBtn) {
-            shareOpenBtn.onclick = () => window.open(result.public_url || `/s/${result.slug}`, '_blank');
+            shareOpenBtn.onclick = () => window.open(publicUrl, '_blank');
         }
 
         showNotice('Public link created!');
@@ -1001,6 +1232,143 @@ previewModal?.addEventListener('click', event => {
     }
 });
 
+// Rectangular Click & Drag (Marquee / Lasso) Selection
+function initMarqueeSelection() {
+    const marquee = document.querySelector('#selection-marquee');
+    if (!marquee) return;
+
+    let isSelecting = false;
+    let startX = 0;
+    let startY = 0;
+    let initialSelected = new Set();
+    let isDragThresholdMet = false;
+
+    document.addEventListener('mousedown', event => {
+        if (event.button !== 0) return;
+
+        const target = event.target;
+        if (
+            target.closest('.file-card') ||
+            target.closest('.bottom-action-bar') ||
+            target.closest('.desktop-sidebar') ||
+            target.closest('.desktop-header') ||
+            target.closest('.mobile-header') ||
+            target.closest('.upload-menu-popup') ||
+            target.closest('.upload-fab-btn') ||
+            target.closest('.upload-progress-panel') ||
+            target.closest('.info-dialog') ||
+            target.closest('button, input, select, textarea, a, form')
+        ) {
+            return;
+        }
+
+        if (!target.closest('.drive-main')) {
+            return;
+        }
+
+        isSelecting = true;
+        isDragThresholdMet = false;
+        startX = event.clientX;
+        startY = event.clientY;
+
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+            initialSelected = new Set(selection);
+        } else {
+            initialSelected = new Set();
+            selection.clear();
+            updateSelectionBar();
+        }
+
+        marquee.style.left = `${startX}px`;
+        marquee.style.top = `${startY}px`;
+        marquee.style.width = '0px';
+        marquee.style.height = '0px';
+    });
+
+    window.addEventListener('mousemove', event => {
+        if (!isSelecting) return;
+
+        const currentX = event.clientX;
+        const currentY = event.clientY;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+
+        if (!isDragThresholdMet) {
+            if (Math.hypot(deltaX, deltaY) > 5) {
+                isDragThresholdMet = true;
+                marquee.hidden = false;
+                document.body.style.userSelect = 'none';
+            } else {
+                return;
+            }
+        }
+
+        const rectLeft = Math.min(startX, currentX);
+        const rectTop = Math.min(startY, currentY);
+        const rectWidth = Math.abs(deltaX);
+        const rectHeight = Math.abs(deltaY);
+        const rectRight = rectLeft + rectWidth;
+        const rectBottom = rectTop + rectHeight;
+
+        marquee.style.left = `${rectLeft}px`;
+        marquee.style.top = `${rectTop}px`;
+        marquee.style.width = `${rectWidth}px`;
+        marquee.style.height = `${rectHeight}px`;
+
+        const cards = list ? list.querySelectorAll('.file-card') : [];
+        const newlySelected = new Set(initialSelected);
+
+        cards.forEach(card => {
+            const cardRect = card.getBoundingClientRect();
+            const intersects = !(
+                cardRect.right < rectLeft ||
+                cardRect.left > rectRight ||
+                cardRect.bottom < rectTop ||
+                cardRect.top > rectBottom
+            );
+
+            const cardId = card.dataset.id;
+            if (intersects) {
+                newlySelected.add(cardId);
+            } else if (!initialSelected.has(cardId)) {
+                newlySelected.delete(cardId);
+            }
+        });
+
+        selection.clear();
+        newlySelected.forEach(id => selection.add(id));
+
+        cards.forEach(card => {
+            card.classList.toggle('selected', selection.has(card.dataset.id));
+        });
+
+        updateSelectionBar();
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (!isSelecting) return;
+        isSelecting = false;
+        if (isDragThresholdMet) {
+            marquee.hidden = true;
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// Browser navigation popstate
+window.addEventListener('popstate', () => {
+    if (window.location.pathname === '/trash') {
+        loadTrash(false);
+    } else {
+        loadFolder('', false);
+    }
+});
+
 // Initial boot
-loadFolder();
+initMarqueeSelection();
+if (window.location.pathname === '/trash') {
+    loadTrash(false);
+} else {
+    loadFolder('', false);
+}
 

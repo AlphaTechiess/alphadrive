@@ -427,8 +427,16 @@ func (s *Service) DeletePermanently(ctx context.Context, userID string, nodeIDs 
 			if err != nil {
 				return err
 			}
-			for _, it := range items {
-				_, _ = tx.ExecContext(ctx, `DELETE FROM nodes WHERE id=? AND user_id=?`, it.id, userID)
+			defer tx.Rollback()
+
+			// Delete bottom-up (children before parents) and wipe associated shares/grants
+			for i := len(items) - 1; i >= 0; i-- {
+				it := items[i]
+				_, _ = tx.ExecContext(ctx, `DELETE FROM share_grants WHERE share_id IN (SELECT id FROM shares WHERE node_id=?)`, it.id)
+				_, _ = tx.ExecContext(ctx, `DELETE FROM shares WHERE node_id=?`, it.id)
+				if _, err := tx.ExecContext(ctx, `DELETE FROM nodes WHERE id=? AND user_id=?`, it.id, userID); err != nil {
+					return err
+				}
 			}
 			if err := tx.Commit(); err != nil {
 				return err
@@ -436,6 +444,27 @@ func (s *Service) DeletePermanently(ctx context.Context, userID string, nodeIDs 
 		}
 	}
 	return nil
+}
+
+func (s *Service) EmptyTrash(ctx context.Context, userID string) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM nodes WHERE user_id=? AND trashed_at IS NOT NULL`, userID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return s.DeletePermanently(ctx, userID, ids)
 }
 
 func (s *Service) WriteZip(ctx context.Context, userID string, nodeIDs []string, w io.Writer) error {

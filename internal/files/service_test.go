@@ -180,3 +180,68 @@ func TestTrashRestoreAndPermanentDelete(t *testing.T) {
 		t.Fatalf("expected node to be deleted from DB, got %v", err)
 	}
 }
+
+func TestEmptyTrash(t *testing.T) {
+	dir := t.TempDir()
+	db, err := database.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	user := "user-empty-trash"
+	_, _ = db.Exec(`INSERT INTO users(id,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?, 'x',0,1,1)`, user, user)
+	service, err := New(db.DB, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.EnsureRoot(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and upload two files
+	f1, err := service.Upload(ctx, user, "", "file1.txt", "file-1-id", strings.NewReader("hello file 1"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f2, err := service.Upload(ctx, user, "", "file2.txt", "file-2-id", strings.NewReader("hello file 2"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Move both to trash
+	if err := service.Trash(ctx, user, []string{f1.ID, f2.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	trashList, err := service.ListTrash(ctx, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trashList) != 2 {
+		t.Fatalf("expected 2 items in trash, got %d", len(trashList))
+	}
+
+	// Empty trash
+	if err := service.EmptyTrash(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify trash is empty
+	trashListAfter, err := service.ListTrash(ctx, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trashListAfter) != 0 {
+		t.Fatalf("expected 0 items in trash after empty, got %d", len(trashListAfter))
+	}
+
+	// Verify physical objects are unlinked
+	if _, err := os.Stat(filepath.Join(dir, "files", "objects", "file-1-id")); !os.IsNotExist(err) {
+		t.Fatalf("expected file 1 object to be deleted, got err: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "files", "objects", "file-2-id")); !os.IsNotExist(err) {
+		t.Fatalf("expected file 2 object to be deleted, got err: %v", err)
+	}
+}

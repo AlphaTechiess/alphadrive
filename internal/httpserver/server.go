@@ -145,11 +145,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /login", s.login)
 	mux.HandleFunc("POST /logout", s.require(s.csrf(s.logout)))
 	mux.HandleFunc("GET /", s.require(s.dashboard))
+	mux.HandleFunc("GET /trash", s.require(s.dashboard))
 	mux.HandleFunc("GET /api/me", s.require(s.me))
 	mux.HandleFunc("GET /api/nodes", s.require(s.listNodes))
 	mux.HandleFunc("GET /api/nodes/{id}", s.require(s.getNode))
 	mux.HandleFunc("GET /api/nodes/{id}/share", s.require(s.getNodeShare))
 	mux.HandleFunc("GET /api/trash", s.require(s.listTrash))
+	mux.HandleFunc("POST /api/trash/empty", s.require(s.csrf(s.emptyTrash)))
+	mux.HandleFunc("DELETE /api/trash", s.require(s.csrf(s.emptyTrash)))
 	mux.HandleFunc("POST /api/folders", s.require(s.csrf(s.createFolder)))
 	mux.HandleFunc("POST /api/uploads", s.require(s.csrf(s.upload)))
 	mux.HandleFunc("POST /api/nodes/trash", s.require(s.csrf(s.trashNodes)))
@@ -530,6 +533,14 @@ func (s *Server) deleteNodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.files.DeletePermanently(r.Context(), p.UserID, input.IDs); err != nil {
+		internalError(w, r, err)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]bool{"success": true})
+}
+func (s *Server) emptyTrash(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	if err := s.files.EmptyTrash(r.Context(), p.UserID); err != nil {
 		internalError(w, r, err)
 		return
 	}
@@ -1166,8 +1177,16 @@ func (s *Server) getNodeShare(w http.ResponseWriter, r *http.Request) {
 	}
 	publicURL := fmt.Sprintf("%s/s/%s", baseURL, sh.Slug)
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"share":      sh,
-		"public_url": publicURL,
+		"id":           sh.ID,
+		"node_id":      sh.NodeID,
+		"slug":         sh.Slug,
+		"has_password": sh.HasPassword,
+		"expires_at":   sh.ExpiresAt,
+		"view_count":   sh.ViewCount,
+		"created_at":   sh.CreatedAt,
+		"updated_at":   sh.UpdatedAt,
+		"public_url":   publicURL,
+		"share":        sh,
 	})
 }
 

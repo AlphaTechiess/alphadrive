@@ -182,9 +182,14 @@ list?.addEventListener('click', event => {
     updateSelectionBar();
 });
 
+let lastDragEndTime = 0;
+
 // Deselect on outside click
 document.addEventListener('click', event => {
     if (!selection.size) return;
+    if (Date.now() - lastDragEndTime < 200) {
+        return;
+    }
     const isCard = event.target.closest('.file-card');
     const isBar = event.target.closest('.bottom-action-bar');
     const isDialog = event.target.closest('#info-modal') || event.target.closest('#preview-modal');
@@ -334,5 +339,123 @@ previewModal?.addEventListener('click', event => {
     if (event.target === previewModal) closePreview();
 });
 
-// Boot folder
+// Rectangular Click & Drag (Marquee / Lasso) Selection
+function initMarqueeSelection() {
+    const marquee = document.querySelector('#selection-marquee');
+    if (!marquee) return;
+
+    let isSelecting = false;
+    let startX = 0;
+    let startY = 0;
+    let initialSelected = new Set();
+    let isDragThresholdMet = false;
+
+    document.addEventListener('mousedown', event => {
+        if (event.button !== 0) return;
+
+        const target = event.target;
+        if (
+            target.closest('.file-card') ||
+            target.closest('.bottom-action-bar') ||
+            target.closest('.public-header') ||
+            target.closest('.info-dialog') ||
+            target.closest('dialog') ||
+            target.closest('button, input, select, textarea, a, form')
+        ) {
+            return;
+        }
+
+        isSelecting = true;
+        isDragThresholdMet = false;
+        startX = event.clientX;
+        startY = event.clientY;
+
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+            initialSelected = new Set(selection);
+        } else {
+            initialSelected = new Set();
+            selection.clear();
+            updateSelectionBar();
+        }
+
+        marquee.style.left = `${startX}px`;
+        marquee.style.top = `${startY}px`;
+        marquee.style.width = '0px';
+        marquee.style.height = '0px';
+    });
+
+    window.addEventListener('mousemove', event => {
+        if (!isSelecting) return;
+
+        const currentX = event.clientX;
+        const currentY = event.clientY;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+
+        if (!isDragThresholdMet) {
+            if (Math.hypot(deltaX, deltaY) > 5) {
+                isDragThresholdMet = true;
+                marquee.hidden = false;
+                document.body.style.userSelect = 'none';
+            } else {
+                return;
+            }
+        }
+
+        const rectLeft = Math.min(startX, currentX);
+        const rectTop = Math.min(startY, currentY);
+        const rectWidth = Math.abs(deltaX);
+        const rectHeight = Math.abs(deltaY);
+        const rectRight = rectLeft + rectWidth;
+        const rectBottom = rectTop + rectHeight;
+
+        marquee.style.left = `${rectLeft}px`;
+        marquee.style.top = `${rectTop}px`;
+        marquee.style.width = `${rectWidth}px`;
+        marquee.style.height = `${rectHeight}px`;
+
+        const cards = list ? list.querySelectorAll('.file-card') : [];
+        const newlySelected = new Set(initialSelected);
+
+        cards.forEach(card => {
+            const cardRect = card.getBoundingClientRect();
+            const intersects = !(
+                cardRect.right < rectLeft ||
+                cardRect.left > rectRight ||
+                cardRect.bottom < rectTop ||
+                cardRect.top > rectBottom
+            );
+
+            const cardId = card.dataset.id;
+            if (intersects) {
+                newlySelected.add(cardId);
+            } else if (!initialSelected.has(cardId)) {
+                newlySelected.delete(cardId);
+            }
+        });
+
+        selection.clear();
+        newlySelected.forEach(id => selection.add(id));
+
+        cards.forEach(card => {
+            card.classList.toggle('selected', selection.has(card.dataset.id));
+        });
+
+        updateSelectionBar();
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (!isSelecting) return;
+        isSelecting = false;
+        if (isDragThresholdMet) {
+            lastDragEndTime = Date.now();
+            marquee.hidden = true;
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// Initial boot
+initMarqueeSelection();
 loadFolder(rootID);
+

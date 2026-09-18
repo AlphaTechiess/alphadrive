@@ -334,8 +334,13 @@ breadcrumbsEl?.addEventListener('click', event => {
     loadFolder(btn.dataset.crumbId);
 });
 
+let lastDragEndTime = 0;
+
 // File list interactions
 list.addEventListener('click', event => {
+    if (Date.now() - lastDragEndTime < 350) {
+        return;
+    }
     const card = event.target.closest('[data-id]');
     if (!card) return;
     const node = nodes.find(item => item.id === card.dataset.id);
@@ -367,12 +372,15 @@ searchInput?.addEventListener('input', renderGrid);
 
 // Deselect when clicking empty space
 document.addEventListener('click', event => {
+    if (Date.now() - lastDragEndTime < 350) {
+        return;
+    }
     if (!selection.size) return;
     const isCard = event.target.closest('.file-card');
     const isBar = event.target.closest('.bottom-action-bar');
     const isMenu = event.target.closest('.upload-menu-popup');
     const isFab = event.target.closest('#upload-toggle');
-    const isDialog = event.target.closest('#info-modal') || event.target.closest('#storage-modal') || event.target.closest('#preview-modal');
+    const isDialog = event.target.closest('dialog') || event.target.closest('.info-dialog');
     if (!isCard && !isBar && !isMenu && !isFab && !isDialog) {
         selection.clear();
         updateSelectionBar();
@@ -1315,12 +1323,9 @@ function initMarqueeSelection() {
             target.closest('.upload-fab-btn') ||
             target.closest('.upload-progress-panel') ||
             target.closest('.info-dialog') ||
+            target.closest('dialog') ||
             target.closest('button, input, select, textarea, a, form')
         ) {
-            return;
-        }
-
-        if (!target.closest('.drive-main')) {
             return;
         }
 
@@ -1407,6 +1412,7 @@ function initMarqueeSelection() {
         if (!isSelecting) return;
         isSelecting = false;
         if (isDragThresholdMet) {
+            lastDragEndTime = Date.now();
             marquee.hidden = true;
             document.body.style.userSelect = '';
         }

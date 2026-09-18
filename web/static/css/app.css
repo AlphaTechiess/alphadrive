@@ -568,6 +568,13 @@ button, input {
 
 .file-card.selected .file-tile {
     border-color: var(--cyan-accent);
+    background: rgba(22, 158, 207, 0.18);
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.35);
+}
+
+.file-card.selected .file-card-name {
+    color: var(--text-white);
+    font-weight: 700;
 }
 
 .file-tile img {

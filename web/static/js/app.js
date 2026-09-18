@@ -221,7 +221,10 @@ function updateSelectionBar() {
 
 function renderGrid() {
     const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
-    const visible = nodes.filter(node => (node.name || '').toLowerCase().includes(query));
+    let visible = nodes;
+    if (currentView === 'trash') {
+        visible = nodes.filter(node => (node.name || '').toLowerCase().includes(query));
+    }
 
     const emptyTrashBtn = document.querySelector('#empty-trash-btn');
     if (currentView === 'trash' && emptyTrashBtn) {
@@ -253,6 +256,9 @@ async function loadFolder(id = '', pushState = true) {
     currentParentId = id;
     selection.clear();
     updateNavState();
+    if (searchInput && searchInput.value) {
+        searchInput.value = '';
+    }
     if (pushState && window.location.pathname !== '/') {
         history.pushState(null, '', '/');
     }
@@ -277,6 +283,9 @@ async function loadTrash(pushState = true) {
     currentView = 'trash';
     selection.clear();
     updateNavState();
+    if (searchInput && searchInput.value) {
+        searchInput.value = '';
+    }
     if (pushState && window.location.pathname !== '/trash') {
         history.pushState(null, '', '/trash');
     }
@@ -549,8 +558,50 @@ list.addEventListener('click', event => {
     updateSelectionBar();
 });
 
+let searchDebounceTimer = null;
+
 // Search
-searchInput?.addEventListener('input', renderGrid);
+searchInput?.addEventListener('input', () => {
+    if (currentView === 'trash') {
+        renderGrid();
+        return;
+    }
+    clearTimeout(searchDebounceTimer);
+    const query = (searchInput.value || '').trim();
+    if (!query) {
+        loadFolder(currentParentId, false);
+        return;
+    }
+    searchDebounceTimer = setTimeout(async () => {
+        selection.clear();
+        updateSelectionBar();
+        list.innerHTML = '<p class="grid-status">Searching…</p>';
+        try {
+            const data = await api(`/api/nodes?q=${encodeURIComponent(query)}`);
+            nodes = data.nodes || [];
+            breadcrumbs = [
+                { id: '', name: 'My drive' },
+                { id: '', name: `Search: "${query}"` }
+            ];
+            renderBreadcrumbs();
+            renderGrid();
+        } catch (error) {
+            showNotice(error.message, true);
+            list.innerHTML = '<p class="grid-status">Search failed.</p>';
+        }
+    }, 150);
+});
+
+searchInput?.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        searchInput.value = '';
+        if (currentView === 'trash') {
+            renderGrid();
+        } else {
+            loadFolder(currentParentId, false);
+        }
+    }
+});
 
 // Deselect when clicking empty space
 document.addEventListener('click', event => {

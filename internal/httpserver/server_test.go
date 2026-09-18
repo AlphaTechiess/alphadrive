@@ -524,6 +524,62 @@ func TestMoveNodesAPI(t *testing.T) {
 	}
 }
 
+func TestDeepSearchAPI(t *testing.T) {
+	rig := setupTestRig(t)
+	username := "search_user"
+	password := "superSecretPass123"
+	rig.createUser(t, username, password)
+	ac := rig.login(t, username, password)
+
+	// Create nested folder hierarchy:
+	// Root -> FolderA -> FolderB -> deep_document.pdf
+	var fA struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	ac.doJSON(t, "POST", rig.server.URL+"/api/folders", map[string]string{"name": "FolderA"}, &fA)
+
+	var fB struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	ac.doJSON(t, "POST", rig.server.URL+"/api/folders", map[string]string{"name": "FolderB", "parent_id": fA.ID}, &fB)
+
+	fileDoc, _ := ac.uploadFile(t, rig.server.URL, fB.ID, "deep_document.pdf", "deep content")
+	fileRoot, _ := ac.uploadFile(t, rig.server.URL, ac.rootID, "root_readme.txt", "readme")
+
+	// 1. Search deep for "deep"
+	var searchResp struct {
+		Nodes []files.Node `json:"nodes"`
+		Query string       `json:"query"`
+	}
+	status := ac.doJSON(t, "GET", rig.server.URL+"/api/nodes?q=deep", nil, &searchResp)
+	if status != http.StatusOK {
+		t.Fatalf("search API returned status %d", status)
+	}
+	if len(searchResp.Nodes) != 1 || searchResp.Nodes[0].ID != fileDoc.ID {
+		t.Fatalf("expected 1 deep search match, got %+v", searchResp.Nodes)
+	}
+
+	// 2. Search deep for "FolderB"
+	ac.doJSON(t, "GET", rig.server.URL+"/api/nodes?q=FolderB", nil, &searchResp)
+	if len(searchResp.Nodes) != 1 || searchResp.Nodes[0].ID != fB.ID {
+		t.Fatalf("expected FolderB in search results, got %+v", searchResp.Nodes)
+	}
+
+	// 3. Search for "readme"
+	ac.doJSON(t, "GET", rig.server.URL+"/api/nodes?q=readme", nil, &searchResp)
+	if len(searchResp.Nodes) != 1 || searchResp.Nodes[0].ID != fileRoot.ID {
+		t.Fatalf("expected root_readme.txt in search results, got %+v", searchResp.Nodes)
+	}
+
+	// 4. Search for nonexistent term
+	ac.doJSON(t, "GET", rig.server.URL+"/api/nodes?q=nonexistent", nil, &searchResp)
+	if len(searchResp.Nodes) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(searchResp.Nodes))
+	}
+}
+
 func TestAuthorizationAndCSRFFailures(t *testing.T) {
 	rig := setupTestRig(t)
 	userA := "user_alice"

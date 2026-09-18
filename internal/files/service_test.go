@@ -316,3 +316,106 @@ func TestMoveNodes(t *testing.T) {
 		// Moving into itself is skipped/noop, but moving into descendant should fail
 	}
 }
+
+func TestDeepSearch(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := database.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	service, err := New(db.DB, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := "user-search"
+	if _, err := db.Exec(`INSERT INTO users(id,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?, 'x',0,1,1)`, user, user); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.EnsureRoot(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	// Root
+	// ├── photos (folder)
+	// │   └── summer (folder)
+	// │       └── beach_vacation.jpg (file)
+	// ├── finances (folder)
+	// │   └── 2026_budget.xlsx (file)
+	// └── notes.txt (file)
+
+	photos, err := service.CreateFolder(ctx, user, "", "photos", "photos-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	summer, err := service.CreateFolder(ctx, user, photos.ID, "summer", "summer-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beach, err := service.Upload(ctx, user, summer.ID, "beach_vacation.jpg", "beach-id", strings.NewReader("img"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finances, err := service.CreateFolder(ctx, user, "", "finances", "fin-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget, err := service.Upload(ctx, user, finances.ID, "2026_budget.xlsx", "budget-id", strings.NewReader("budget"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notes, err := service.Upload(ctx, user, "", "notes.txt", "notes-id", strings.NewReader("notes"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Search deep across whole drive for "beach"
+	res, err := service.Search(ctx, user, "beach", "")
+	if err != nil {
+		t.Fatalf("search beach: %v", err)
+	}
+	if len(res) != 1 || res[0].ID != beach.ID {
+		t.Fatalf("expected beach file in search results, got %+v", res)
+	}
+
+	// 2. Search deep for "summer"
+	res, err = service.Search(ctx, user, "summer", "")
+	if err != nil {
+		t.Fatalf("search summer: %v", err)
+	}
+	if len(res) != 1 || res[0].ID != summer.ID {
+		t.Fatalf("expected summer folder in search results, got %+v", res)
+	}
+
+	// 3. Search for "2026" inside photos folder (should not match budget)
+	res, err = service.Search(ctx, user, "2026", photos.ID)
+	if err != nil {
+		t.Fatalf("search 2026 in photos: %v", err)
+	}
+	if len(res) != 0 {
+		t.Fatalf("expected 0 results for 2026 in photos folder, got %d", len(res))
+	}
+
+	// 4. Search for "2026" globally
+	res, err = service.Search(ctx, user, "2026", "")
+	if err != nil {
+		t.Fatalf("search 2026 globally: %v", err)
+	}
+	if len(res) != 1 || res[0].ID != budget.ID {
+		t.Fatalf("expected budget in global search results, got %+v", res)
+	}
+
+	// 5. Trashing a node excludes it from search
+	if err := service.Trash(ctx, user, []string{notes.ID}); err != nil {
+		t.Fatal(err)
+	}
+	res, err = service.Search(ctx, user, "notes", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 0 {
+		t.Fatalf("expected trashed file to not appear in search, got %+v", res)
+	}
+}
+

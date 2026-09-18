@@ -57,6 +57,68 @@ func (s *Service) EnsureRoot(ctx context.Context, userID string) error {
 func RootID(userID string) string { return rootID(userID) }
 func rootID(userID string) string { return "root_" + userID }
 
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+func (s *Service) Search(ctx context.Context, userID, query, folderID string) ([]Node, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []Node{}, nil
+	}
+	root := rootID(userID)
+	pattern := "%" + escapeLike(query) + "%"
+
+	var rows *sql.Rows
+	var err error
+
+	if folderID != "" && folderID != root {
+		if !s.ownedFolder(ctx, userID, folderID) {
+			return nil, ErrNotFound
+		}
+		rows, err = s.db.QueryContext(ctx, `
+			WITH RECURSIVE tree(id) AS (
+				SELECT id FROM nodes WHERE id=? AND user_id=? AND trashed_at IS NULL
+				UNION ALL
+				SELECT n.id FROM nodes n JOIN tree t ON n.parent_id = t.id WHERE n.user_id=? AND n.trashed_at IS NULL
+			)
+			SELECT n.id, coalesce(n.parent_id,''), n.kind, n.name, coalesce(n.mime_type,''), n.size_bytes, n.created_at, n.updated_at
+			FROM nodes n
+			JOIN tree t ON n.id = t.id
+			WHERE n.user_id=? AND n.trashed_at IS NULL AND n.id != ? AND n.name LIKE ? ESCAPE '\'
+			ORDER BY n.kind DESC, n.name COLLATE NOCASE
+		`, folderID, userID, userID, userID, folderID, pattern)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT id, coalesce(parent_id,''), kind, name, coalesce(mime_type,''), size_bytes, created_at, updated_at
+			FROM nodes
+			WHERE user_id=? AND trashed_at IS NULL AND id != ? AND name LIKE ? ESCAPE '\'
+			ORDER BY kind DESC, name COLLATE NOCASE
+		`, userID, root, pattern)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Node
+	for rows.Next() {
+		var n Node
+		var created, updated int64
+		if err := rows.Scan(&n.ID, &n.ParentID, &n.Kind, &n.Name, &n.MIMEType, &n.Size, &created, &updated); err != nil {
+			return nil, err
+		}
+		n.CreatedAt = time.Unix(created, 0).UTC()
+		n.UpdatedAt = time.Unix(updated, 0).UTC()
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
 func (s *Service) List(ctx context.Context, userID, parentID string) ([]Node, error) {
 	if parentID == "" {
 		parentID = rootID(userID)

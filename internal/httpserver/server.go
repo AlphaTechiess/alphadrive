@@ -449,6 +449,26 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 	p, _ := s.principal(r)
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query != "" {
+		parentID := r.URL.Query().Get("parent_id")
+		nodes, err := s.files.Search(r.Context(), p.UserID, query, parentID)
+		if errors.Is(err, files.ErrNotFound) {
+			apiError(w, http.StatusNotFound, "not_found", "Folder not found.")
+			return
+		}
+		if err != nil {
+			internalError(w, r, err)
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]any{
+			"nodes":       nodes,
+			"query":       query,
+			"breadcrumbs": []files.Node{{ID: files.RootID(p.UserID), Name: "Search results", Kind: "folder"}},
+		})
+		return
+	}
+
 	parentID := r.URL.Query().Get("parent_id")
 	if parentID == "" {
 		parentID = files.RootID(p.UserID)

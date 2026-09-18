@@ -390,11 +390,6 @@ func (s *Service) Revoke(ctx context.Context, userID, shareID string) error {
 	return nil
 }
 
-func (s *Service) IncrementViews(ctx context.Context, shareID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE shares SET view_count = view_count + 1 WHERE id=?`, shareID)
-	return err
-}
-
 func (s *Service) VerifyPassword(sh *Share, password string) bool {
 	if !sh.HasPassword || sh.PasswordHash == nil {
 		return true

@@ -418,4 +418,3 @@ func TestDeepSearch(t *testing.T) {
 		t.Fatalf("expected trashed file to not appear in search, got %+v", res)
 	}
 }
-

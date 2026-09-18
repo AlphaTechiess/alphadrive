@@ -194,14 +194,14 @@ document.addEventListener('click', event => {
     }
 });
 
-// Download All function
+// Download All function (downloads the entire shared folder)
 async function downloadAll() {
     try {
         showNotice('Preparing download archive…');
         const response = await fetch(`/s/${encodeURIComponent(slug)}/download`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder_id: currentFolderId }),
+            body: JSON.stringify({ folder_id: rootID }),
         });
         if (!response.ok) throw new Error('Failed to generate archive');
         const blob = await response.blob();
@@ -221,7 +221,6 @@ async function downloadAll() {
 }
 
 document.querySelector('#public-download-all-btn')?.addEventListener('click', downloadAll);
-document.querySelector('#public-download-all-top')?.addEventListener('click', downloadAll);
 
 // Download Selected
 document.querySelector('#public-download-selected')?.addEventListener('click', () => {

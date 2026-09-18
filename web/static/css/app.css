@@ -1583,23 +1583,74 @@ button, input {
         flex-direction: column;
         align-items: center;
         margin-top: 24px;
+        width: 100%;
     }
 
-    .mobile-logo-link {
-        display: block;
-        margin-bottom: 18px;
+    .mobile-header-top {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        margin-bottom: 22px;
+        padding: 0 4px;
     }
 
-    .mobile-logo {
-        width: 200px;
-        height: auto;
-        display: block;
+    .mobile-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+    }
+
+    .mobile-logo-icon {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+    }
+
+    .mobile-brand-text {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-white);
+        letter-spacing: -0.5px;
+    }
+
+    .mobile-account-btn {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        padding: 6px;
+        border-radius: 50%;
+        transition: background 0.15s;
+    }
+
+    .mobile-account-btn:hover {
+        background: rgba(44, 66, 105, 0.4);
+    }
+
+    .mobile-account-btn svg {
+        width: 28px;
+        height: 28px;
+        stroke: #6178a0;
+        transition: stroke 0.15s;
+    }
+
+    .mobile-account-btn:hover svg {
+        stroke: var(--text-white);
     }
 
     .mobile-tabs {
         display: flex;
         align-items: center;
-        gap: 16px;
+        justify-content: center;
+        gap: 14px;
         margin-bottom: 24px;
     }
 
@@ -1610,13 +1661,18 @@ button, input {
         background: transparent;
         border: 0;
         color: var(--text-muted);
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 700;
         display: flex;
         align-items: center;
         gap: 10px;
         cursor: pointer;
         transition: background 0.15s, color 0.15s;
+    }
+
+    .mobile-tab-btn:hover {
+        background: rgba(44, 66, 105, 0.4);
+        color: var(--text-white);
     }
 
     .mobile-tab-btn.active {

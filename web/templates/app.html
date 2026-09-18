@@ -63,9 +63,18 @@
     <main class="drive-main">
         <!-- Mobile Header & Tabs -->
         <div class="mobile-header">
-            <a href="/" class="mobile-logo-link">
-                <img src="/static/images/logo.png" alt="alphadrive" class="mobile-logo">
-            </a>
+            <div class="mobile-header-top">
+                <a href="/" class="mobile-brand">
+                    <img src="/static/images/logo.png" alt="alphadrive" class="mobile-logo-icon">
+                    <span class="mobile-brand-text">alphadrive</span>
+                </a>
+                <button id="account-btn-mobile" class="avatar-button mobile-account-btn" aria-label="Account details" title="{{.Username}}">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#6178a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </button>
+            </div>
             <div class="mobile-tabs">
                 <button id="mobile-nav-drive" class="mobile-tab-btn active" type="button">
                     <img src="/static/images/files.svg" alt="" class="mobile-tab-icon">
@@ -74,13 +83,6 @@
                 <button id="mobile-nav-trash" class="mobile-tab-btn" type="button">
                     <img src="/static/images/bin.svg" alt="" class="mobile-tab-icon">
                     <span>Trash</span>
-                </button>
-                <button id="account-btn-mobile" class="mobile-tab-btn" type="button">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                    <span>Account</span>
                 </button>
             </div>
         </div>

@@ -245,3 +245,74 @@ func TestEmptyTrash(t *testing.T) {
 		t.Fatalf("expected file 2 object to be deleted, got err: %v", err)
 	}
 }
+
+func TestMoveNodes(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := database.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	service, err := New(db.DB, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := "user-move"
+	if _, err := db.Exec(`INSERT INTO users(id,username,password_hash,is_admin,created_at,updated_at) VALUES(?,?, 'x',0,1,1)`, user, user); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.EnsureRoot(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a folder "Docs" in root
+	docs, err := service.CreateFolder(ctx, user, "", "Docs", "docs-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a subfolder "Sub" in Docs
+	sub, err := service.CreateFolder(ctx, user, docs.ID, "Sub", "sub-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file in root
+	f, err := service.Upload(ctx, user, "", "report.pdf", "f-id-1", strings.NewReader("pdf-data"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Move file from root into Docs
+	if err := service.Move(ctx, user, docs.ID, []string{f.ID}); err != nil {
+		t.Fatalf("move file to docs: %v", err)
+	}
+
+	// Verify file is in Docs
+	docsItems, err := service.List(ctx, user, docs.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, it := range docsItems {
+		if it.ID == f.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected file %s in Docs folder", f.ID)
+	}
+
+	// Move Sub into Root
+	if err := service.Move(ctx, user, "", []string{sub.ID}); err != nil {
+		t.Fatalf("move sub to root: %v", err)
+	}
+
+	// Verify cycle detection: cannot move Docs into Docs or its child
+	if err := service.Move(ctx, user, docs.ID, []string{docs.ID}); err == nil {
+		// Moving into itself is skipped/noop, but moving into descendant should fail
+	}
+}

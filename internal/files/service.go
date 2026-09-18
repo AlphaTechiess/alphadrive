@@ -378,6 +378,90 @@ func (s *Service) Restore(ctx context.Context, userID string, nodeIDs []string) 
 	return nil
 }
 
+func (s *Service) Move(ctx context.Context, userID, targetID string, nodeIDs []string) error {
+	if len(nodeIDs) == 0 {
+		return nil
+	}
+	root := rootID(userID)
+	if targetID == "" {
+		targetID = root
+	}
+
+	// Verify target exists, belongs to user, is a folder, and is not trashed
+	var targetKind string
+	err := s.db.QueryRowContext(ctx, `SELECT kind FROM nodes WHERE id=? AND user_id=? AND trashed_at IS NULL`, targetID, userID).Scan(&targetKind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%w: target folder does not exist", ErrNotFound)
+	}
+	if err != nil {
+		return err
+	}
+	if targetKind != "folder" {
+		return fmt.Errorf("target must be a folder")
+	}
+
+	nowUnix := now()
+	for _, id := range nodeIDs {
+		if id == "" || id == root {
+			continue
+		}
+		if id == targetID {
+			continue
+		}
+
+		var currentParentID, name, kind string
+		err := s.db.QueryRowContext(ctx, `SELECT coalesce(parent_id, ''), name, kind FROM nodes WHERE id=? AND user_id=? AND trashed_at IS NULL`, id, userID).Scan(&currentParentID, &name, &kind)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		if currentParentID == targetID {
+			continue
+		}
+
+		if kind == "folder" {
+			var isDescendant int
+			err := s.db.QueryRowContext(ctx, `
+				WITH RECURSIVE subnodes(id) AS (
+					SELECT id FROM nodes WHERE id=? AND user_id=?
+					UNION ALL
+					SELECT n.id FROM nodes n JOIN subnodes s ON n.parent_id = s.id WHERE n.user_id=?
+				)
+				SELECT count(*) FROM subnodes WHERE id=?
+			`, id, userID, userID, targetID).Scan(&isDescendant)
+			if err == nil && isDescendant > 0 {
+				return fmt.Errorf("cannot move a folder into itself or its subfolders")
+			}
+		}
+
+		finalName := name
+		var exists int
+		_ = s.db.QueryRowContext(ctx, `SELECT count(*) FROM nodes WHERE user_id=? AND parent_id=? AND name=? AND trashed_at IS NULL AND id!=?`, userID, targetID, finalName, id).Scan(&exists)
+		if exists > 0 {
+			ext := filepath.Ext(name)
+			base := strings.TrimSuffix(name, ext)
+			for i := 1; i <= 100; i++ {
+				candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
+				var count int
+				_ = s.db.QueryRowContext(ctx, `SELECT count(*) FROM nodes WHERE user_id=? AND parent_id=? AND name=? AND trashed_at IS NULL AND id!=?`, userID, targetID, candidate, id).Scan(&count)
+				if count == 0 {
+					finalName = candidate
+					break
+				}
+			}
+		}
+
+		_, err = s.db.ExecContext(ctx, `UPDATE nodes SET parent_id=?, name=?, updated_at=? WHERE id=? AND user_id=?`, targetID, finalName, nowUnix, id, userID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Service) DeletePermanently(ctx context.Context, userID string, nodeIDs []string) error {
 	if len(nodeIDs) == 0 {
 		return nil

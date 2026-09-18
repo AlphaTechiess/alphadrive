@@ -237,12 +237,12 @@ function renderGrid() {
     }
 
     list.innerHTML = visible.map(node => `
-        <button class="file-card ${selection.has(node.id) ? 'selected' : ''}" type="button" data-id="${node.id}" data-kind="${node.kind}">
+        <div class="file-card ${selection.has(node.id) ? 'selected' : ''}" role="button" tabindex="0" data-id="${node.id}" data-kind="${node.kind}" draggable="true">
             <span class="file-tile">
-                <img src="/static/images/${iconFor(node)}" alt="">
+                <img src="/static/images/${iconFor(node)}" alt="" draggable="false">
             </span>
             <span class="file-card-name" title="${esc(node.name)}">${esc(node.name)}</span>
-        </button>
+        </div>
     `).join('');
 
     updateSelectionBar();
@@ -335,6 +335,188 @@ breadcrumbsEl?.addEventListener('click', event => {
 });
 
 let lastDragEndTime = 0;
+let draggedNodeIds = [];
+
+// Drag and drop into folders
+list.addEventListener('dragstart', event => {
+    if (currentView !== 'drive') {
+        event.preventDefault();
+        return;
+    }
+    const card = event.target.closest('.file-card');
+    if (!card) return;
+    const cardId = card.dataset.id;
+    if (!cardId) return;
+
+    if (!selection.has(cardId)) {
+        selection.clear();
+        selection.add(cardId);
+        updateSelectionBar();
+    }
+
+    draggedNodeIds = Array.from(selection);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', JSON.stringify(draggedNodeIds));
+
+    setTimeout(() => {
+        draggedNodeIds.forEach(id => {
+            const el = list.querySelector(`.file-card[data-id="${id}"]`);
+            if (el) el.classList.add('is-dragging');
+        });
+    }, 10);
+});
+
+list.addEventListener('dragend', () => {
+    list.querySelectorAll('.file-card').forEach(el => {
+        el.classList.remove('is-dragging', 'drop-hover');
+    });
+    breadcrumbsEl?.querySelectorAll('.breadcrumb-btn').forEach(el => {
+        el.classList.remove('drop-hover');
+    });
+    document.querySelector('#nav-drive')?.classList.remove('drop-hover');
+    draggedNodeIds = [];
+});
+
+list.addEventListener('dragover', event => {
+    if (!draggedNodeIds.length || currentView !== 'drive') return;
+    const folderCard = event.target.closest('.file-card[data-kind="folder"]');
+    if (folderCard) {
+        const folderId = folderCard.dataset.id;
+        if (folderId && !draggedNodeIds.includes(folderId)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            if (!folderCard.classList.contains('drop-hover')) {
+                list.querySelectorAll('.file-card.drop-hover').forEach(el => el.classList.remove('drop-hover'));
+                folderCard.classList.add('drop-hover');
+            }
+            return;
+        }
+    }
+    list.querySelectorAll('.file-card.drop-hover').forEach(el => el.classList.remove('drop-hover'));
+});
+
+list.addEventListener('dragleave', event => {
+    const folderCard = event.target.closest('.file-card');
+    if (folderCard && !folderCard.contains(event.relatedTarget)) {
+        folderCard.classList.remove('drop-hover');
+    }
+});
+
+list.addEventListener('drop', async event => {
+    if (!draggedNodeIds.length || currentView !== 'drive') return;
+    const folderCard = event.target.closest('.file-card[data-kind="folder"]');
+    if (!folderCard) return;
+    const targetFolderId = folderCard.dataset.id;
+    if (!targetFolderId || draggedNodeIds.includes(targetFolderId)) return;
+
+    event.preventDefault();
+    folderCard.classList.remove('drop-hover');
+    const idsToMove = [...draggedNodeIds];
+    draggedNodeIds = [];
+
+    try {
+        const targetNode = nodes.find(n => n.id === targetFolderId);
+        showNotice(`Moving ${idsToMove.length} item(s) to "${targetNode ? targetNode.name : 'folder'}"…`);
+        await api('/api/nodes/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_id: targetFolderId, ids: idsToMove }),
+        });
+        showNotice(`Moved ${idsToMove.length} item(s) to "${targetNode ? targetNode.name : 'folder'}"`);
+        selection.clear();
+        loadFolder(currentParentId);
+    } catch (err) {
+        showNotice(err.message, true);
+    }
+});
+
+// Breadcrumbs drop support
+breadcrumbsEl?.addEventListener('dragover', event => {
+    if (!draggedNodeIds.length || currentView !== 'drive') return;
+    const crumbBtn = event.target.closest('[data-crumb-id]');
+    if (crumbBtn) {
+        const targetId = crumbBtn.dataset.crumbId;
+        if (targetId !== currentParentId && !draggedNodeIds.includes(targetId)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            crumbBtn.classList.add('drop-hover');
+            return;
+        }
+    }
+    breadcrumbsEl.querySelectorAll('.drop-hover').forEach(el => el.classList.remove('drop-hover'));
+});
+
+breadcrumbsEl?.addEventListener('dragleave', event => {
+    const crumbBtn = event.target.closest('[data-crumb-id]');
+    if (crumbBtn && !crumbBtn.contains(event.relatedTarget)) {
+        crumbBtn.classList.remove('drop-hover');
+    }
+});
+
+breadcrumbsEl?.addEventListener('drop', async event => {
+    if (!draggedNodeIds.length || currentView !== 'drive') return;
+    const crumbBtn = event.target.closest('[data-crumb-id]');
+    if (!crumbBtn) return;
+    const targetFolderId = crumbBtn.dataset.crumbId;
+    if (targetFolderId === currentParentId || draggedNodeIds.includes(targetFolderId)) return;
+
+    event.preventDefault();
+    crumbBtn.classList.remove('drop-hover');
+    const idsToMove = [...draggedNodeIds];
+    draggedNodeIds = [];
+
+    try {
+        const destName = crumbBtn.textContent.trim() || 'folder';
+        showNotice(`Moving ${idsToMove.length} item(s) to "${destName}"…`);
+        await api('/api/nodes/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_id: targetFolderId, ids: idsToMove }),
+        });
+        showNotice(`Moved ${idsToMove.length} item(s) to "${destName}"`);
+        selection.clear();
+        loadFolder(currentParentId);
+    } catch (err) {
+        showNotice(err.message, true);
+    }
+});
+
+// Sidebar "My drive" drop support
+const navDrive = document.querySelector('#nav-drive');
+navDrive?.addEventListener('dragover', event => {
+    if (!draggedNodeIds.length || currentView !== 'drive' || !currentParentId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    navDrive.classList.add('drop-hover');
+});
+
+navDrive?.addEventListener('dragleave', event => {
+    if (!navDrive.contains(event.relatedTarget)) {
+        navDrive.classList.remove('drop-hover');
+    }
+});
+
+navDrive?.addEventListener('drop', async event => {
+    if (!draggedNodeIds.length || currentView !== 'drive' || !currentParentId) return;
+    event.preventDefault();
+    navDrive.classList.remove('drop-hover');
+    const idsToMove = [...draggedNodeIds];
+    draggedNodeIds = [];
+
+    try {
+        showNotice(`Moving ${idsToMove.length} item(s) to My drive…`);
+        await api('/api/nodes/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_id: '', ids: idsToMove }),
+        });
+        showNotice(`Moved ${idsToMove.length} item(s) to My drive`);
+        selection.clear();
+        loadFolder(currentParentId);
+    } catch (err) {
+        showNotice(err.message, true);
+    }
+});
 
 // File list interactions
 list.addEventListener('click', event => {

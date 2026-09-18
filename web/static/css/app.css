@@ -599,6 +599,29 @@ button, input {
     font-weight: 700;
 }
 
+.file-card.is-dragging {
+    opacity: 0.4;
+    transform: scale(0.96);
+}
+
+.file-card.drop-hover .file-tile {
+    border-color: var(--mint-accent) !important;
+    background: rgba(0, 245, 215, 0.22) !important;
+    box-shadow: 0 0 24px rgba(0, 245, 215, 0.75) !important;
+    transform: scale(1.06);
+}
+
+.breadcrumb-btn.drop-hover {
+    color: var(--mint-accent) !important;
+    text-shadow: 0 0 10px rgba(0, 245, 215, 0.7);
+    transform: scale(1.08);
+}
+
+.nav-item.drop-hover {
+    background: rgba(0, 245, 215, 0.2) !important;
+    color: var(--mint-accent) !important;
+}
+
 .file-tile img {
     width: 58px;
     height: 58px;

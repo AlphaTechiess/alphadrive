@@ -157,6 +157,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/uploads", s.require(s.csrf(s.upload)))
 	mux.HandleFunc("POST /api/nodes/trash", s.require(s.csrf(s.trashNodes)))
 	mux.HandleFunc("POST /api/nodes/restore", s.require(s.csrf(s.restoreNodes)))
+	mux.HandleFunc("POST /api/nodes/move", s.require(s.csrf(s.moveNodes)))
 	mux.HandleFunc("DELETE /api/nodes", s.require(s.csrf(s.deleteNodes)))
 	mux.HandleFunc("POST /api/nodes/download", s.require(s.csrf(s.downloadZip)))
 	mux.HandleFunc("GET /api/files/{id}/download", s.require(s.download))
@@ -523,6 +524,33 @@ func (s *Server) restoreNodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]bool{"success": true})
+}
+func (s *Server) moveNodes(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	var input struct {
+		TargetID string   `json:"target_id"`
+		IDs      []string `json:"ids"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if len(input.IDs) == 0 {
+		apiError(w, http.StatusBadRequest, "invalid_input", "No items specified to move.")
+		return
+	}
+	if err := s.files.Move(r.Context(), p.UserID, input.TargetID, input.IDs); err != nil {
+		if errors.Is(err, files.ErrNotFound) {
+			apiError(w, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		if strings.Contains(err.Error(), "cannot move") || strings.Contains(err.Error(), "target must be") {
+			apiError(w, http.StatusBadRequest, "invalid_move", err.Error())
+			return
+		}
+		internalError(w, r, err)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"status": "ok", "moved_count": len(input.IDs)})
 }
 func (s *Server) deleteNodes(w http.ResponseWriter, r *http.Request) {
 	p, _ := s.principal(r)

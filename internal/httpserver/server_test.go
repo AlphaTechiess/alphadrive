@@ -488,6 +488,42 @@ func TestTrashRestoreAndPermanentDeleteLifecycle(t *testing.T) {
 	}
 }
 
+func TestMoveNodesAPI(t *testing.T) {
+	rig := setupTestRig(t)
+	user := "moveuser"
+	pass := "superSecretPass123"
+	rig.createUser(t, user, pass)
+	ac := rig.login(t, user, pass)
+
+	var targetFolder files.Node
+	ac.doJSON(t, "POST", rig.server.URL+"/api/folders", map[string]string{"parent_id": ac.rootID, "name": "TargetFolder"}, &targetFolder)
+
+	file1, _ := ac.uploadFile(t, rig.server.URL, ac.rootID, "file1.zip", "data1")
+	file2, _ := ac.uploadFile(t, rig.server.URL, ac.rootID, "file2.zip", "data2")
+
+	// Move both files to TargetFolder
+	var moveResp struct {
+		Status     string `json:"status"`
+		MovedCount int    `json:"moved_count"`
+	}
+	status := ac.doJSON(t, "POST", rig.server.URL+"/api/nodes/move", map[string]any{
+		"target_id": targetFolder.ID,
+		"ids":       []string{file1.ID, file2.ID},
+	}, &moveResp)
+	if status != http.StatusOK || moveResp.Status != "ok" || moveResp.MovedCount != 2 {
+		t.Fatalf("move API failed: status %d, resp %+v", status, moveResp)
+	}
+
+	// Verify items now in target folder
+	var listResp struct {
+		Nodes []files.Node `json:"nodes"`
+	}
+	ac.doJSON(t, "GET", rig.server.URL+"/api/nodes?parent_id="+targetFolder.ID, nil, &listResp)
+	if len(listResp.Nodes) != 2 {
+		t.Fatalf("expected 2 items in target folder, got %d", len(listResp.Nodes))
+	}
+}
+
 func TestAuthorizationAndCSRFFailures(t *testing.T) {
 	rig := setupTestRig(t)
 	userA := "user_alice"

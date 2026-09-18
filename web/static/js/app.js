@@ -819,9 +819,15 @@ async function openSelectedShare() {
         shareNodeIdInput.value = id;
     }
 
-    // Hide both initially to avoid flashing the wrong state
-    if (shareActiveState) shareActiveState.hidden = true;
-    if (shareCreateForm) shareCreateForm.hidden = true;
+    // Strictly hide both initially
+    if (shareActiveState) {
+        shareActiveState.hidden = true;
+        shareActiveState.style.display = 'none';
+    }
+    if (shareCreateForm) {
+        shareCreateForm.hidden = true;
+        shareCreateForm.style.display = 'none';
+    }
 
     // Check if an active share already exists in DB
     try {
@@ -830,8 +836,14 @@ async function openSelectedShare() {
         const slug = sh.slug || res.slug;
         if (slug) {
             const publicUrl = res.public_url || `${window.location.origin}/s/${slug}`;
-            if (shareActiveState) shareActiveState.hidden = false;
-            if (shareCreateForm) shareCreateForm.hidden = true;
+            if (shareActiveState) {
+                shareActiveState.hidden = false;
+                shareActiveState.style.display = 'flex';
+            }
+            if (shareCreateForm) {
+                shareCreateForm.hidden = true;
+                shareCreateForm.style.display = 'none';
+            }
             if (shareLinkInput) shareLinkInput.value = publicUrl;
             if (shareActiveDetails) {
                 const parts = [
@@ -850,9 +862,13 @@ async function openSelectedShare() {
         }
     } catch (e) {
         // No active share found, show create form
-        if (shareActiveState) shareActiveState.hidden = true;
+        if (shareActiveState) {
+            shareActiveState.hidden = true;
+            shareActiveState.style.display = 'none';
+        }
         if (shareCreateForm) {
             shareCreateForm.hidden = false;
+            shareCreateForm.style.display = 'flex';
             if (shareCustomSlugInput) shareCustomSlugInput.value = '';
             if (shareNewPasswordInput) shareNewPasswordInput.value = '';
             if (shareNewExpirySelect) shareNewExpirySelect.value = '';
@@ -902,8 +918,14 @@ shareCreateForm?.addEventListener('submit', async event => {
         const slug = sh.slug || res.slug;
         const publicUrl = res.public_url || `${window.location.origin}/s/${slug}`;
 
-        if (shareActiveState) shareActiveState.hidden = false;
-        if (shareCreateForm) shareCreateForm.hidden = true;
+        if (shareActiveState) {
+            shareActiveState.hidden = false;
+            shareActiveState.style.display = 'flex';
+        }
+        if (shareCreateForm) {
+            shareCreateForm.hidden = true;
+            shareCreateForm.style.display = 'none';
+        }
         if (shareLinkInput) shareLinkInput.value = publicUrl;
         if (shareActiveDetails) {
             const parts = [
@@ -960,9 +982,13 @@ shareRevokeBtn?.addEventListener('click', async () => {
             method: 'DELETE',
         });
         showNotice('Public link revoked');
-        if (shareActiveState) shareActiveState.hidden = true;
+        if (shareActiveState) {
+            shareActiveState.hidden = true;
+            shareActiveState.style.display = 'none';
+        }
         if (shareCreateForm) {
             shareCreateForm.hidden = false;
+            shareCreateForm.style.display = 'flex';
             if (shareCustomSlugInput) shareCustomSlugInput.value = '';
             if (shareNewPasswordInput) shareNewPasswordInput.value = '';
             if (shareNewExpirySelect) shareNewExpirySelect.value = '';

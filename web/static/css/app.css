@@ -942,28 +942,35 @@ button, input {
 }
 
 .upload-item-cancel-btn {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
-    border: 0;
-    background: rgba(133, 148, 176, 0.15);
-    color: var(--text-muted);
-    font-size: 16px;
-    line-height: 1;
-    display: grid;
-    place-items: center;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.18);
+    color: #ff6b6b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: color 0.15s, background 0.15s, transform 0.1s;
+    transition: all 0.15s ease;
     padding: 0;
+    flex-shrink: 0;
 }
 
 .upload-item-cancel-btn:hover {
     color: #ffffff;
-    background: rgba(239, 68, 68, 0.4);
+    background: #ef4444;
+    border-color: #ef4444;
+    transform: scale(1.08);
 }
 
 .upload-item-cancel-btn:active {
     transform: scale(0.92);
+}
+
+.upload-item-cancel-btn svg {
+    display: block;
+    pointer-events: none;
 }
 
 .upload-item-status {

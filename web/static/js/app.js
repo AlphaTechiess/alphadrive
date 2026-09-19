@@ -818,7 +818,12 @@ function renderUploadQueue() {
         }
 
         const cancelBtnHtml = showCancel
-            ? `<button type="button" class="upload-item-cancel-btn" title="Cancel upload" aria-label="Cancel upload" data-cancel-id="${item.id}">&times;</button>`
+            ? `<button type="button" class="upload-item-cancel-btn" title="Cancel upload" aria-label="Cancel upload" data-cancel-id="${item.id}">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>`
             : '';
 
         li.innerHTML = `
@@ -1764,6 +1769,18 @@ window.addEventListener('popstate', () => {
     }
 });
 
+// Global Escape handler
+window.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        closeUploadMenu();
+        if (selection.size) {
+            selection.clear();
+            updateSelectionBar();
+        }
+        closePreview();
+    }
+});
+
 // Initial boot
 initMarqueeSelection();
 if (window.location.pathname === '/trash') {
@@ -1771,4 +1788,5 @@ if (window.location.pathname === '/trash') {
 } else {
     loadFolder('', false);
 }
+
 

@@ -120,13 +120,13 @@ function iconFor(item) {
     const name = (typeof item === 'string' ? item : (item.name || '')).toLowerCase();
     const mime = typeof item === 'object' ? (item.mime_type || '').toLowerCase() : '';
     if (name.endsWith('.pdf') || mime === 'application/pdf') return 'pdf.svg';
+    if (/\.(xlsx?|xlsm|xlsb|xltx?|xltm|csv|tsv|ods|numbers|tab)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime === 'text/csv' || mime === 'text/tab-separated-values' || mime.includes('opendocument.spreadsheet')) return 'sheet.svg';
+    if (/\.(pptx?|ppsx?|potx?|pptm|potm|odp|key)$/i.test(name) || mime.includes('presentation') || mime.includes('powerpoint') || mime.includes('opendocument.presentation')) return 'ppt.svg';
+    if (/\.(docx?|dotx?|docm|dotm|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name) || mime.includes('wordprocessingml') || mime.includes('msword') || mime.includes('opendocument.text') || (mime.includes('word') && !mime.includes('spreadsheet') && !mime.includes('presentation')) || mime === 'text/plain' || mime === 'text/markdown' || mime === 'application/rtf') return 'doc.svg';
     if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name) || mime.includes('zip') || mime.includes('tar') || mime.includes('compressed')) return 'zip.svg';
     if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name) || mime.startsWith('audio/')) return 'audio.svg';
     if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name) || mime.startsWith('video/')) return 'video.svg';
     if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name) || mime.startsWith('image/')) return 'image.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name) || mime.includes('word') || mime.includes('document')) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/i.test(name) || mime.includes('presentation') || mime.includes('powerpoint')) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime.includes('csv')) return 'sheet.svg';
     if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name) || mime.includes('json') || mime.includes('javascript') || mime.includes('xml')) return 'code.svg';
     return 'files.svg';
 }

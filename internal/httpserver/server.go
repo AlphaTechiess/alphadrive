@@ -1628,6 +1628,12 @@ func iconForFilename(name, kind string) string {
 	if strings.HasSuffix(n, ".pdf") {
 		return "pdf.svg"
 	}
+	if isSheetExt(n) {
+		return "sheet.svg"
+	}
+	if isPptExt(n) {
+		return "ppt.svg"
+	}
 	if isImgExt(n) {
 		return "image.svg"
 	}
@@ -1640,17 +1646,11 @@ func iconForFilename(name, kind string) string {
 	if strings.HasSuffix(n, ".zip") || strings.HasSuffix(n, ".tar") || strings.HasSuffix(n, ".gz") || strings.HasSuffix(n, ".rar") || strings.HasSuffix(n, ".7z") || strings.HasSuffix(n, ".bz2") || strings.HasSuffix(n, ".xz") {
 		return "zip.svg"
 	}
-	if isCodeExt(n) {
-		return "code.svg"
-	}
 	if isDocExt(n) {
 		return "doc.svg"
 	}
-	if isPptExt(n) {
-		return "ppt.svg"
-	}
-	if isSheetExt(n) {
-		return "sheet.svg"
+	if isCodeExt(n) {
+		return "code.svg"
 	}
 	return "files.svg"
 }
@@ -1689,7 +1689,7 @@ func isTextExt(n string) bool {
 	return strings.HasSuffix(n, ".txt") || strings.HasSuffix(n, ".md") || strings.HasSuffix(n, ".json") ||
 		strings.HasSuffix(n, ".js") || strings.HasSuffix(n, ".ts") || strings.HasSuffix(n, ".css") ||
 		strings.HasSuffix(n, ".html") || strings.HasSuffix(n, ".go") || strings.HasSuffix(n, ".py") ||
-		strings.HasSuffix(n, ".log") || strings.HasSuffix(n, ".csv") || strings.HasSuffix(n, ".xml") || strings.HasSuffix(n, ".sql") ||
+		strings.HasSuffix(n, ".log") || strings.HasSuffix(n, ".xml") || strings.HasSuffix(n, ".sql") ||
 		strings.HasSuffix(n, ".yaml") || strings.HasSuffix(n, ".yml") || strings.HasSuffix(n, ".sh") || strings.HasSuffix(n, ".env")
 }
 
@@ -1708,18 +1708,21 @@ func isCodeExt(n string) bool {
 }
 
 func isDocExt(n string) bool {
-	return strings.HasSuffix(n, ".doc") || strings.HasSuffix(n, ".docx") || strings.HasSuffix(n, ".odt") ||
-		strings.HasSuffix(n, ".pages") || strings.HasSuffix(n, ".rtf") || strings.HasSuffix(n, ".txt") ||
-		strings.HasSuffix(n, ".md") || strings.HasSuffix(n, ".log") || strings.HasSuffix(n, ".ini") ||
-		strings.HasSuffix(n, ".conf") || strings.HasSuffix(n, ".cfg")
+	return strings.HasSuffix(n, ".doc") || strings.HasSuffix(n, ".docx") || strings.HasSuffix(n, ".dotx") ||
+		strings.HasSuffix(n, ".docm") || strings.HasSuffix(n, ".odt") || strings.HasSuffix(n, ".pages") ||
+		strings.HasSuffix(n, ".rtf") || strings.HasSuffix(n, ".txt") || strings.HasSuffix(n, ".md") ||
+		strings.HasSuffix(n, ".log") || strings.HasSuffix(n, ".ini") || strings.HasSuffix(n, ".conf") || strings.HasSuffix(n, ".cfg")
 }
 
 func isPptExt(n string) bool {
-	return strings.HasSuffix(n, ".ppt") || strings.HasSuffix(n, ".pptx") || strings.HasSuffix(n, ".odp") ||
+	return strings.HasSuffix(n, ".ppt") || strings.HasSuffix(n, ".pptx") || strings.HasSuffix(n, ".ppsx") ||
+		strings.HasSuffix(n, ".potx") || strings.HasSuffix(n, ".pptm") || strings.HasSuffix(n, ".odp") ||
 		strings.HasSuffix(n, ".key")
 }
 
 func isSheetExt(n string) bool {
-	return strings.HasSuffix(n, ".xls") || strings.HasSuffix(n, ".xlsx") || strings.HasSuffix(n, ".csv") ||
-		strings.HasSuffix(n, ".tsv") || strings.HasSuffix(n, ".ods") || strings.HasSuffix(n, ".numbers")
+	return strings.HasSuffix(n, ".xls") || strings.HasSuffix(n, ".xlsx") || strings.HasSuffix(n, ".xlsm") ||
+		strings.HasSuffix(n, ".xlsb") || strings.HasSuffix(n, ".xltx") || strings.HasSuffix(n, ".xltm") ||
+		strings.HasSuffix(n, ".csv") || strings.HasSuffix(n, ".tsv") || strings.HasSuffix(n, ".tab") ||
+		strings.HasSuffix(n, ".ods") || strings.HasSuffix(n, ".numbers")
 }

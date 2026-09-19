@@ -1693,4 +1693,3 @@ func isSheetExt(n string) bool {
 	return strings.HasSuffix(n, ".xls") || strings.HasSuffix(n, ".xlsx") || strings.HasSuffix(n, ".csv") ||
 		strings.HasSuffix(n, ".tsv") || strings.HasSuffix(n, ".ods") || strings.HasSuffix(n, ".numbers")
 }
-

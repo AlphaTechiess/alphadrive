@@ -825,8 +825,8 @@ function renderUploadQueue() {
         }
 
         const pct = item.total > 0 ? Math.min(100, Math.round((item.loaded / item.total) * 100)) : 0;
-        const displayName = item.customName || item.file.name;
-        const icon = iconForFilename(displayName);
+        const displayName = item.customName || item.relPath || item.file.webkitRelativePath || item.file.name;
+        const icon = iconForFilename(item.customName || item.file.name);
 
         const li = document.createElement('li');
         li.className = 'upload-item-row';
@@ -1038,15 +1038,73 @@ function promptUploadConflict(file, suggestedName) {
     });
 }
 
-async function enqueueFiles(filesList, parentId) {
-    if (!filesList || !filesList.length) return;
+async function ensureFolderPath(relPath, rootParentId, folderCache) {
+    if (!relPath || !relPath.includes('/')) {
+        return rootParentId;
+    }
+    const parts = relPath.split('/').slice(0, -1);
+    let currentParent = rootParentId;
+    let accumulatedPath = '';
+
+    for (const part of parts) {
+        if (!part) continue;
+        accumulatedPath = accumulatedPath ? `${accumulatedPath}/${part}` : part;
+        const cacheKey = `${rootParentId}::${accumulatedPath}`;
+
+        if (folderCache[cacheKey]) {
+            currentParent = folderCache[cacheKey];
+        } else {
+            const res = await api('/api/folders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parent_id: currentParent, name: part }),
+            });
+            currentParent = res.id;
+            folderCache[cacheKey] = res.id;
+        }
+    }
+    return currentParent;
+}
+
+async function enqueueFiles(filesList, parentId, emptyDirs = []) {
+    if ((!filesList || !filesList.length) && (!emptyDirs || !emptyDirs.length)) return;
+
+    const folderCache = {};
+
+    // Create empty directories if any were dropped
+    if (emptyDirs && emptyDirs.length) {
+        for (const dirPath of emptyDirs) {
+            try {
+                await ensureFolderPath(dirPath + '/dummy_placeholder', parentId, folderCache);
+            } catch (e) {
+                console.warn('Could not create empty folder', dirPath, e);
+            }
+        }
+    }
+
+    if (!filesList || !filesList.length) {
+        loadFolder(currentParentId);
+        return;
+    }
 
     const existingNames = new Set(nodes.filter(n => n.kind === 'file').map(n => n.name));
     const itemsToEnqueue = [];
 
     for (const file of filesList) {
+        const relPath = file.relativePath || file.webkitRelativePath || '';
+        let targetParentId = parentId;
+
+        if (relPath && relPath.includes('/')) {
+            try {
+                targetParentId = await ensureFolderPath(relPath, parentId, folderCache);
+            } catch (err) {
+                console.error('Error creating folder hierarchy for', relPath, err);
+                targetParentId = parentId;
+            }
+        }
+
         const lowerName = (file.name || '').toLowerCase();
-        const hasConflict = currentView === 'drive' && parentId === currentParentId &&
+        const hasConflict = currentView === 'drive' && targetParentId === currentParentId &&
             Array.from(existingNames).some(n => n.toLowerCase() === lowerName);
 
         if (hasConflict) {
@@ -1058,27 +1116,35 @@ async function enqueueFiles(filesList, parentId) {
             } else if (decision.action === 'replace') {
                 itemsToEnqueue.push({
                     file,
-                    parentId,
+                    parentId: targetParentId,
                     replace: true,
+                    relPath,
                 });
             } else if (decision.action === 'rename') {
                 existingNames.add(decision.newName);
                 itemsToEnqueue.push({
                     file,
-                    parentId,
+                    parentId: targetParentId,
                     customName: decision.newName,
+                    relPath,
                 });
             }
         } else {
-            existingNames.add(file.name);
+            if (targetParentId === currentParentId) {
+                existingNames.add(file.name);
+            }
             itemsToEnqueue.push({
                 file,
-                parentId,
+                parentId: targetParentId,
+                relPath,
             });
         }
     }
 
-    if (!itemsToEnqueue.length) return;
+    if (!itemsToEnqueue.length) {
+        loadFolder(currentParentId);
+        return;
+    }
 
     if (uploadProgressPanel) {
         uploadProgressPanel.hidden = false;
@@ -1092,6 +1158,7 @@ async function enqueueFiles(filesList, parentId) {
             parentId: item.parentId,
             customName: item.customName,
             replace: item.replace,
+            relPath: item.relPath,
             loaded: 0,
             total: item.file.size || 0,
             status: 'pending',
@@ -2478,18 +2545,19 @@ window.addEventListener('drop', async event => {
     const items = dt.items;
     if (items && items.length > 0 && typeof items[0].webkitGetAsEntry === 'function') {
         const filesToUpload = [];
+        const emptyDirs = [];
         const entryPromises = [];
 
         for (let i = 0; i < items.length; i++) {
             const entry = items[i].webkitGetAsEntry();
             if (entry) {
-                entryPromises.push(scanEntry(entry, filesToUpload));
+                entryPromises.push(scanEntry(entry, filesToUpload, emptyDirs));
             }
         }
 
         await Promise.all(entryPromises);
-        if (filesToUpload.length > 0) {
-            enqueueFiles(filesToUpload, currentParentId);
+        if (filesToUpload.length > 0 || emptyDirs.length > 0) {
+            enqueueFiles(filesToUpload, currentParentId, emptyDirs);
             return;
         }
     }
@@ -2500,24 +2568,31 @@ window.addEventListener('drop', async event => {
     }
 });
 
-async function scanEntry(entry, fileList) {
+async function scanEntry(entry, fileList, emptyDirs = [], currentPath = '') {
+    const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
     if (entry.isFile) {
         return new Promise(resolve => {
             entry.file(file => {
+                file.relativePath = entryPath;
                 fileList.push(file);
                 resolve();
             }, () => resolve());
         });
     } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
+        let entriesCount = 0;
         return new Promise(resolve => {
             const readEntries = () => {
                 dirReader.readEntries(async entries => {
                     if (!entries.length) {
+                        if (entriesCount === 0 && emptyDirs) {
+                            emptyDirs.push(entryPath);
+                        }
                         resolve();
                     } else {
+                        entriesCount += entries.length;
                         for (const child of entries) {
-                            await scanEntry(child, fileList);
+                            await scanEntry(child, fileList, emptyDirs, entryPath);
                         }
                         readEntries();
                     }

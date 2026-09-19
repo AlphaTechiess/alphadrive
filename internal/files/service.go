@@ -229,6 +229,19 @@ func (s *Service) CreateFolder(ctx context.Context, userID, parentID, name, id s
 	if !s.ownedFolder(ctx, userID, parentID) {
 		return Node{}, ErrNotFound
 	}
+
+	var existing Node
+	var cAt, uAt int64
+	err = s.db.QueryRowContext(ctx, `SELECT id, parent_id, kind, name, created_at, updated_at FROM nodes WHERE user_id=? AND parent_id=? AND name=? AND trashed_at IS NULL`, userID, parentID, name).Scan(&existing.ID, &existing.ParentID, &existing.Kind, &existing.Name, &cAt, &uAt)
+	if err == nil {
+		if existing.Kind == "folder" {
+			existing.CreatedAt = time.Unix(cAt, 0).UTC()
+			existing.UpdatedAt = time.Unix(uAt, 0).UTC()
+			return existing, nil
+		}
+		return Node{}, errors.New("a file with that name already exists")
+	}
+
 	t := now()
 	_, err = s.db.ExecContext(ctx, `INSERT INTO nodes(id,user_id,parent_id,kind,name,created_at,updated_at) VALUES(?,?,?,'folder',?,?,?)`, id, userID, parentID, name, t, t)
 	if err != nil {

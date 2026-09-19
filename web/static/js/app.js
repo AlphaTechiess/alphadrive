@@ -1766,12 +1766,15 @@ function loadScript(src) {
     return new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[src="${src}"]`);
         if (existing) {
-            if (existing.dataset.loaded === 'true') {
-                resolve();
-                return;
+            if (existing.dataset.loaded === 'true' || existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                return resolve();
             }
-            existing.addEventListener('load', () => resolve());
-            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+            existing.addEventListener('load', () => {
+                existing.dataset.loaded = 'true';
+                resolve();
+            }, { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            setTimeout(() => resolve(), 100);
             return;
         }
         const script = document.createElement('script');
@@ -1781,7 +1784,7 @@ function loadScript(src) {
             script.dataset.loaded = 'true';
             resolve();
         };
-        script.onerror = () => reject(new Error(`Failed to load script`));
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
         document.head.appendChild(script);
     });
 }
@@ -1800,14 +1803,19 @@ function renderUnsupportedFallback(container, node, downloadUrl) {
 
 async function renderSpreadsheetPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering spreadsheet…</p>';
-    if (typeof window.XLSX === 'undefined') {
+    const getXLSX = () => window.XLSX || (typeof XLSX !== 'undefined' ? XLSX : null);
+    if (!getXLSX()) {
         try {
             await loadScript('/static/js/vendor/xlsx.full.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
         }
     }
-    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+    const xlsxLib = getXLSX();
+    if (!xlsxLib) {
+        throw new Error('Spreadsheet renderer is not available');
+    }
+    const workbook = xlsxLib.read(arrayBuffer, { type: 'array' });
     const sheetNames = workbook.SheetNames || [];
     if (!sheetNames.length) {
         container.innerHTML = '<div class="preview-spreadsheet-empty">This spreadsheet has no sheets.</div>';
@@ -1823,7 +1831,7 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
             return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" is empty.</div>`;
         }
 
-        const rawData = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const rawData = xlsxLib.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         if (!rawData || !rawData.length) {
             return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
         }
@@ -1908,14 +1916,19 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
 
 async function renderDocxPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering document…</p>';
-    if (typeof window.mammoth === 'undefined') {
+    const getMammoth = () => window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
+    if (!getMammoth()) {
         try {
             await loadScript('/static/js/vendor/mammoth.browser.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
         }
     }
-    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+    const mammothLib = getMammoth();
+    if (!mammothLib) {
+        throw new Error('Word document renderer is not available');
+    }
+    const result = await mammothLib.convertToHtml({ arrayBuffer });
     const html = (result && result.value) || '';
     if (!html.trim()) {
         container.innerHTML = `
@@ -1939,14 +1952,19 @@ async function renderDocxPreview(container, arrayBuffer) {
 
 async function renderZipPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Reading archive…</p>';
-    if (typeof window.JSZip === 'undefined') {
+    const getJSZip = () => window.JSZip || (typeof JSZip !== 'undefined' ? JSZip : null);
+    if (!getJSZip()) {
         try {
             await loadScript('/static/js/vendor/jszip.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
         }
     }
-    const zip = await window.JSZip.loadAsync(arrayBuffer);
+    const jszipLib = getJSZip();
+    if (!jszipLib) {
+        throw new Error('Zip archive renderer is not available');
+    }
+    const zip = await jszipLib.loadAsync(arrayBuffer);
     const files = [];
     zip.forEach((relativePath, zipEntry) => {
         files.push({
@@ -2008,14 +2026,16 @@ async function renderZipPreview(container, arrayBuffer) {
 }
 
 async function renderMarkdownPreview(container, text) {
-    if (typeof window.marked === 'undefined') {
+    const getMarked = () => window.marked || (typeof marked !== 'undefined' ? marked : null);
+    if (!getMarked()) {
         try {
             await loadScript('/static/js/vendor/marked.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
         }
     }
-    const html = window.marked.parse(text);
+    const markedLib = getMarked();
+    const html = markedLib ? markedLib.parse(text) : text;
     container.innerHTML = `
         <div class="preview-doc-wrapper">
             <div class="preview-doc-container">
@@ -2069,7 +2089,7 @@ async function openPreview(node) {
             console.error('Spreadsheet preview failed:', err);
             renderUnsupportedFallback(previewBody, node, downloadUrl);
         }
-    } else if (/\.docx$/i.test(name) || mime.includes('wordprocessingml')) {
+    } else if (/\.(docx?|dotx?|docm|dotm)$/i.test(name) || mime.includes('word') || mime.includes('wordprocessingml')) {
         try {
             const resp = await fetch(viewUrl);
             if (!resp.ok) throw new Error('Could not load document');

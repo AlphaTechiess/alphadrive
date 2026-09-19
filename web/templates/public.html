@@ -66,29 +66,8 @@
                     <img src="/static/images/download.svg" alt="Download">
                 </a>
             </div>
-            <div id="public-preview-content" class="public-preview-container" style="margin-bottom: 0;">
-                {{if .IsImage}}
-                    <img src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" alt="{{.Share.NodeName}}" class="preview-media">
-                {{else if .IsVideo}}
-                    <video src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" controls autoplay playsinline class="preview-video"></video>
-                {{else if .IsAudio}}
-                    <div class="preview-audio-container">
-                        <img src="/static/images/audio.svg" alt="" class="preview-audio-banner">
-                        <p class="preview-audio-name">{{.Share.NodeName}}</p>
-                        <audio controls autoplay src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" class="preview-audio-player"></audio>
-                    </div>
-                {{else if .IsPDF}}
-                    <iframe src="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/view" class="preview-frame" title="{{.Share.NodeName}}"></iframe>
-                {{else if .IsText}}
-                    <pre class="preview-code"><code>{{.TextContent}}</code></pre>
-                {{else}}
-                    <div class="preview-unsupported-box">
-                        <img src="/static/images/{{.FileIcon}}" alt="" class="preview-unsupported-icon">
-                        <p class="preview-unsupported-name">{{.Share.NodeName}}</p>
-                        <p class="preview-unsupported-size">{{.FormattedSize}}</p>
-                        <a href="/s/{{.Share.Slug}}/files/{{.Share.NodeID}}/download" download class="btn-submit preview-download-cta">Download File</a>
-                    </div>
-                {{end}}
+            <div id="public-preview-content" class="public-preview-container" data-node-id="{{.Share.NodeID}}" data-node-name="{{.Share.NodeName}}" data-node-mime="{{.Share.NodeMIME}}" data-node-size="{{.Share.NodeSize}}" style="margin-bottom: 0;">
+                <p class="grid-status">Loading preview…</p>
             </div>
         </div>
     </main>
@@ -157,10 +136,13 @@
             <div id="preview-body" class="preview-body"></div>
         </div>
     </dialog>
+    {{end}}
 
+    {{if .Share}}
     <script>
         window.ALPHADRIVE_SHARE_SLUG = "{{.Share.Slug}}";
         window.ALPHADRIVE_SHARE_ROOT = "{{.Share.NodeID}}";
+        window.ALPHADRIVE_SHARE_STATE = "{{.State}}";
     </script>
     <script defer src="/static/js/vendor/xlsx.full.min.js"></script>
     <script defer src="/static/js/vendor/mammoth.browser.min.js"></script>

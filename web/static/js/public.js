@@ -276,12 +276,15 @@ function loadScript(src) {
     return new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[src="${src}"]`);
         if (existing) {
-            if (existing.dataset.loaded === 'true') {
-                resolve();
-                return;
+            if (existing.dataset.loaded === 'true' || existing.readyState === 'complete' || existing.readyState === 'loaded') {
+                return resolve();
             }
-            existing.addEventListener('load', () => resolve());
-            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+            existing.addEventListener('load', () => {
+                existing.dataset.loaded = 'true';
+                resolve();
+            }, { once: true });
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+            setTimeout(() => resolve(), 100);
             return;
         }
         const script = document.createElement('script');
@@ -291,7 +294,7 @@ function loadScript(src) {
             script.dataset.loaded = 'true';
             resolve();
         };
-        script.onerror = () => reject(new Error(`Failed to load script`));
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
         document.head.appendChild(script);
     });
 }
@@ -310,14 +313,19 @@ function renderUnsupportedFallback(container, node, downloadUrl) {
 
 async function renderSpreadsheetPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering spreadsheet…</p>';
-    if (typeof window.XLSX === 'undefined') {
+    const getXLSX = () => window.XLSX || (typeof XLSX !== 'undefined' ? XLSX : null);
+    if (!getXLSX()) {
         try {
             await loadScript('/static/js/vendor/xlsx.full.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
         }
     }
-    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+    const xlsxLib = getXLSX();
+    if (!xlsxLib) {
+        throw new Error('Spreadsheet renderer is not available');
+    }
+    const workbook = xlsxLib.read(arrayBuffer, { type: 'array' });
     const sheetNames = workbook.SheetNames || [];
     if (!sheetNames.length) {
         container.innerHTML = '<div class="preview-spreadsheet-empty">This spreadsheet has no sheets.</div>';
@@ -333,7 +341,7 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
             return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" is empty.</div>`;
         }
 
-        const rawData = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const rawData = xlsxLib.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         if (!rawData || !rawData.length) {
             return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
         }
@@ -418,14 +426,19 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
 
 async function renderDocxPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering document…</p>';
-    if (typeof window.mammoth === 'undefined') {
+    const getMammoth = () => window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
+    if (!getMammoth()) {
         try {
             await loadScript('/static/js/vendor/mammoth.browser.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
         }
     }
-    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+    const mammothLib = getMammoth();
+    if (!mammothLib) {
+        throw new Error('Word document renderer is not available');
+    }
+    const result = await mammothLib.convertToHtml({ arrayBuffer });
     const html = (result && result.value) || '';
     if (!html.trim()) {
         container.innerHTML = `
@@ -449,14 +462,19 @@ async function renderDocxPreview(container, arrayBuffer) {
 
 async function renderZipPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Reading archive…</p>';
-    if (typeof window.JSZip === 'undefined') {
+    const getJSZip = () => window.JSZip || (typeof JSZip !== 'undefined' ? JSZip : null);
+    if (!getJSZip()) {
         try {
             await loadScript('/static/js/vendor/jszip.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
         }
     }
-    const zip = await window.JSZip.loadAsync(arrayBuffer);
+    const jszipLib = getJSZip();
+    if (!jszipLib) {
+        throw new Error('Zip archive renderer is not available');
+    }
+    const zip = await jszipLib.loadAsync(arrayBuffer);
     const files = [];
     zip.forEach((relativePath, zipEntry) => {
         files.push({
@@ -518,14 +536,16 @@ async function renderZipPreview(container, arrayBuffer) {
 }
 
 async function renderMarkdownPreview(container, text) {
-    if (typeof window.marked === 'undefined') {
+    const getMarked = () => window.marked || (typeof marked !== 'undefined' ? marked : null);
+    if (!getMarked()) {
         try {
             await loadScript('/static/js/vendor/marked.min.js');
         } catch (e) {
             await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
         }
     }
-    const html = window.marked.parse(text);
+    const markedLib = getMarked();
+    const html = markedLib ? markedLib.parse(text) : text;
     container.innerHTML = `
         <div class="preview-doc-wrapper">
             <div class="preview-doc-container">
@@ -535,30 +555,21 @@ async function renderMarkdownPreview(container, text) {
     `;
 }
 
-// File Preview
-async function openPreview(node) {
-    if (!node || !previewModal) return;
-    if (previewTitle) previewTitle.textContent = node.name || 'File preview';
-    if (previewIcon) previewIcon.src = `/static/images/${iconFor(node)}`;
-    if (previewDownloadBtn) {
-        previewDownloadBtn.href = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/download`;
-        previewDownloadBtn.setAttribute('download', node.name || 'download');
-    }
-
+async function renderPreviewToContainer(container, node) {
+    if (!node || !container) return;
     const downloadUrl = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/download`;
     const viewUrl = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/view`;
     const mime = (node.mime_type || '').toLowerCase();
     const name = (node.name || '').toLowerCase();
 
-    if (previewBody) previewBody.innerHTML = '<p class="grid-status">Loading preview…</p>';
-    previewModal.showModal();
+    container.innerHTML = '<p class="grid-status">Loading preview…</p>';
 
     if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) {
-        previewBody.innerHTML = `<img class="preview-media" src="${viewUrl}" alt="${esc(node.name)}">`;
+        container.innerHTML = `<img class="preview-media" src="${viewUrl}" alt="${esc(node.name)}">`;
     } else if (mime.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) {
-        previewBody.innerHTML = `<video class="preview-video" controls autoplay playsinline src="${viewUrl}"></video>`;
+        container.innerHTML = `<video class="preview-video" controls autoplay playsinline src="${viewUrl}"></video>`;
     } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) {
-        previewBody.innerHTML = `
+        container.innerHTML = `
             <div class="preview-audio-container">
                 <img src="/static/images/audio.svg" alt="" class="preview-audio-banner">
                 <p class="preview-audio-name">${esc(node.name)}</p>
@@ -566,46 +577,46 @@ async function openPreview(node) {
             </div>
         `;
     } else if (mime === 'application/pdf' || name.endsWith('.pdf')) {
-        previewBody.innerHTML = `<iframe class="preview-frame" src="${viewUrl}" title="${esc(node.name)}"></iframe>`;
+        container.innerHTML = `<iframe class="preview-frame" src="${viewUrl}" title="${esc(node.name)}"></iframe>`;
     } else if (/\.(xlsx?|ods|csv|tsv)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime === 'text/csv' || mime === 'text/tab-separated-values') {
         try {
             const resp = await fetch(viewUrl);
             if (!resp.ok) throw new Error('Could not load spreadsheet');
             const arrayBuffer = await resp.arrayBuffer();
-            await renderSpreadsheetPreview(previewBody, arrayBuffer);
+            await renderSpreadsheetPreview(container, arrayBuffer);
         } catch (err) {
             console.error('Spreadsheet preview failed:', err);
-            renderUnsupportedFallback(previewBody, node, downloadUrl);
+            renderUnsupportedFallback(container, node, downloadUrl);
         }
-    } else if (/\.docx$/i.test(name) || mime.includes('wordprocessingml')) {
+    } else if (/\.(docx?|dotx?|docm|dotm)$/i.test(name) || mime.includes('word') || mime.includes('wordprocessingml')) {
         try {
             const resp = await fetch(viewUrl);
             if (!resp.ok) throw new Error('Could not load document');
             const arrayBuffer = await resp.arrayBuffer();
-            await renderDocxPreview(previewBody, arrayBuffer);
+            await renderDocxPreview(container, arrayBuffer);
         } catch (err) {
             console.error('DOCX preview failed:', err);
-            renderUnsupportedFallback(previewBody, node, downloadUrl);
+            renderUnsupportedFallback(container, node, downloadUrl);
         }
     } else if (/\.zip$/i.test(name) || mime === 'application/zip' || mime === 'application/x-zip-compressed') {
         try {
             const resp = await fetch(viewUrl);
             if (!resp.ok) throw new Error('Could not load zip archive');
             const arrayBuffer = await resp.arrayBuffer();
-            await renderZipPreview(previewBody, arrayBuffer);
+            await renderZipPreview(container, arrayBuffer);
         } catch (err) {
             console.error('ZIP preview failed:', err);
-            renderUnsupportedFallback(previewBody, node, downloadUrl);
+            renderUnsupportedFallback(container, node, downloadUrl);
         }
     } else if (/\.(md|markdown)$/i.test(name) || mime === 'text/markdown') {
         try {
             const resp = await fetch(viewUrl);
             if (!resp.ok) throw new Error('Could not load markdown');
             const text = await resp.text();
-            await renderMarkdownPreview(previewBody, text);
+            await renderMarkdownPreview(container, text);
         } catch (err) {
             console.error('Markdown preview failed:', err);
-            renderUnsupportedFallback(previewBody, node, downloadUrl);
+            renderUnsupportedFallback(container, node, downloadUrl);
         }
     } else if (
         !/\.(docx?|xlsx?|pptx?|odt|ods|odp|zip|tar|gz|rar|7z|bz2|xz|iso|bin|exe|dll|dmg|pkg|apk|deb|rpm|epub|psd|ai|key|pages|numbers)$/i.test(name) &&
@@ -623,12 +634,28 @@ async function openPreview(node) {
             if (!resp.ok) throw new Error('Could not load text content');
             const text = await resp.text();
             const displayText = text.length > 500000 ? text.slice(0, 500000) + '\n\n… [Content truncated]' : text;
-            previewBody.innerHTML = `<pre class="preview-code"><code>${esc(displayText)}</code></pre>`;
+            container.innerHTML = `<pre class="preview-code"><code>${esc(displayText)}</code></pre>`;
         } catch (e) {
-            previewBody.innerHTML = `<p class="grid-status">Unable to display text preview: ${esc(e.message)}</p>`;
+            container.innerHTML = `<p class="grid-status">Unable to display text preview: ${esc(e.message)}</p>`;
         }
     } else {
-        renderUnsupportedFallback(previewBody, node, downloadUrl);
+        renderUnsupportedFallback(container, node, downloadUrl);
+    }
+}
+
+// File Preview
+async function openPreview(node) {
+    if (!node || !previewModal) return;
+    if (previewTitle) previewTitle.textContent = node.name || 'File preview';
+    if (previewIcon) previewIcon.src = `/static/images/${iconFor(node)}`;
+    if (previewDownloadBtn) {
+        previewDownloadBtn.href = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/download`;
+        previewDownloadBtn.setAttribute('download', node.name || 'download');
+    }
+
+    previewModal.showModal();
+    if (previewBody) {
+        await renderPreviewToContainer(previewBody, node);
     }
 }
 
@@ -764,6 +791,15 @@ function initMarqueeSelection() {
 }
 
 // Initial boot
-initMarqueeSelection();
-loadFolder(rootID);
-
+const singleFileEl = document.querySelector('#public-preview-content');
+if (singleFileEl && singleFileEl.dataset.nodeId) {
+    renderPreviewToContainer(singleFileEl, {
+        id: singleFileEl.dataset.nodeId,
+        name: singleFileEl.dataset.nodeName,
+        mime_type: singleFileEl.dataset.nodeMime,
+        size_bytes: parseInt(singleFileEl.dataset.nodeSize, 10) || 0,
+    });
+} else if (list) {
+    initMarqueeSelection();
+    loadFolder(rootID);
+}

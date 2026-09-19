@@ -685,12 +685,13 @@ function iconForFilename(name) {
     return 'files.svg';
 }
 
-function uploadWithXHR(file, parentId, onProgress) {
+function uploadWithXHR(item, onProgress) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        item.xhr = xhr;
         const form = new FormData();
-        form.set('parent_id', parentId);
-        form.set('file', file);
+        form.set('parent_id', item.parentId);
+        form.set('file', item.file);
 
         xhr.open('POST', '/api/uploads', true);
         if (csrf) {
@@ -704,6 +705,7 @@ function uploadWithXHR(file, parentId, onProgress) {
         };
 
         xhr.onload = () => {
+            item.xhr = null;
             if (xhr.status >= 200 && xhr.status < 300) {
                 try {
                     const data = JSON.parse(xhr.responseText);
@@ -722,15 +724,44 @@ function uploadWithXHR(file, parentId, onProgress) {
         };
 
         xhr.onerror = () => {
-            reject(new Error('Network error during upload'));
+            item.xhr = null;
+            if (item.status === 'cancelled') {
+                reject(new Error('Upload cancelled'));
+            } else {
+                reject(new Error('Network error during upload'));
+            }
+        };
+
+        xhr.onabort = () => {
+            item.xhr = null;
+            reject(new Error('Upload cancelled'));
         };
 
         xhr.ontimeout = () => {
+            item.xhr = null;
             reject(new Error('Upload timed out'));
         };
 
         xhr.send(form);
     });
+}
+
+function cancelUpload(id) {
+    const item = uploadQueue.find(it => it.id === id);
+    if (!item) return;
+
+    if (item.status === 'uploading' && item.xhr) {
+        item.status = 'cancelled';
+        item.errorMsg = 'Cancelled';
+        try {
+            item.xhr.abort();
+        } catch {}
+    } else if (item.status === 'pending') {
+        item.status = 'cancelled';
+        item.errorMsg = 'Cancelled';
+    }
+
+    renderUploadQueue();
 }
 
 function renderUploadQueue() {
@@ -741,13 +772,22 @@ function renderUploadQueue() {
     let loadedBytes = 0;
     let completedCount = 0;
     let errorCount = 0;
+    let cancelledCount = 0;
 
     uploadQueue.forEach(item => {
         const itemSize = item.total || item.file.size || 1;
         totalBytes += itemSize;
-        loadedBytes += item.loaded || 0;
-        if (item.status === 'completed') completedCount++;
-        if (item.status === 'error') errorCount++;
+
+        if (item.status === 'completed') {
+            completedCount++;
+            loadedBytes += itemSize;
+        } else if (item.status === 'error') {
+            errorCount++;
+        } else if (item.status === 'cancelled') {
+            cancelledCount++;
+        } else {
+            loadedBytes += item.loaded || 0;
+        }
 
         const pct = item.total > 0 ? Math.min(100, Math.round((item.loaded / item.total) * 100)) : 0;
         const icon = iconForFilename(item.file.name);
@@ -758,17 +798,28 @@ function renderUploadQueue() {
 
         let statusHtml = '';
         let fillClass = '';
+        let showCancel = false;
+
         if (item.status === 'uploading') {
             statusHtml = `<span class="upload-item-status">${pct}%</span>`;
+            showCancel = true;
         } else if (item.status === 'completed') {
             statusHtml = `<span class="upload-item-status status-complete">✓ Done</span>`;
             fillClass = 'complete';
         } else if (item.status === 'error') {
             statusHtml = `<span class="upload-item-status status-error" title="${esc(item.errorMsg || 'Failed')}">✕ Failed</span>`;
             fillClass = 'error';
+        } else if (item.status === 'cancelled') {
+            statusHtml = `<span class="upload-item-status status-cancelled">✕ Cancelled</span>`;
+            fillClass = 'cancelled';
         } else {
             statusHtml = `<span class="upload-item-status">Queued</span>`;
+            showCancel = true;
         }
+
+        const cancelBtnHtml = showCancel
+            ? `<button type="button" class="upload-item-cancel-btn" title="Cancel upload" aria-label="Cancel upload" data-cancel-id="${item.id}">&times;</button>`
+            : '';
 
         li.innerHTML = `
             <div class="upload-item-main">
@@ -776,10 +827,13 @@ function renderUploadQueue() {
                     <img src="/static/images/${icon}" alt="" class="upload-item-icon">
                     <span class="upload-item-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
                 </div>
-                ${statusHtml}
+                <div class="upload-item-side">
+                    ${statusHtml}
+                    ${cancelBtnHtml}
+                </div>
             </div>
             <div class="upload-item-track">
-                <div class="upload-item-fill ${fillClass}" style="width: ${item.status === 'completed' ? '100' : pct}%;"></div>
+                <div class="upload-item-fill ${fillClass}" style="width: ${item.status === 'completed' ? '100' : (item.status === 'cancelled' ? '0' : pct)}%;"></div>
             </div>
         `;
         uploadProgressList.appendChild(li);
@@ -791,11 +845,15 @@ function renderUploadQueue() {
     }
 
     const totalCount = uploadQueue.length;
-    if (completedCount + errorCount === totalCount && totalCount > 0) {
+    if (completedCount + errorCount + cancelledCount === totalCount && totalCount > 0) {
         if (uploadProgressTitle) {
-            uploadProgressTitle.textContent = errorCount > 0 
-                ? `Upload complete (${completedCount} done, ${errorCount} failed)`
-                : `Upload complete (${totalCount} file${totalCount > 1 ? 's' : ''})`;
+            if (cancelledCount > 0 && completedCount === 0 && errorCount === 0) {
+                uploadProgressTitle.textContent = 'Uploads cancelled';
+            } else if (errorCount > 0 || cancelledCount > 0) {
+                uploadProgressTitle.textContent = `Upload complete (${completedCount} done, ${errorCount + cancelledCount} stopped)`;
+            } else {
+                uploadProgressTitle.textContent = `Upload complete (${totalCount} file${totalCount > 1 ? 's' : ''})`;
+            }
         }
         if (uploadProgressSummary) {
             uploadProgressSummary.textContent = `${overallPct}%`;
@@ -822,7 +880,8 @@ async function processUploadQueue() {
         renderUploadQueue();
 
         try {
-            await uploadWithXHR(nextItem.file, nextItem.parentId, (loaded, total) => {
+            await uploadWithXHR(nextItem, (loaded, total) => {
+                if (nextItem.status === 'cancelled') return;
                 nextItem.loaded = loaded;
                 nextItem.total = total;
                 const row = document.getElementById(`upload-row-${nextItem.id}`);
@@ -837,7 +896,11 @@ async function processUploadQueue() {
                 let allLoaded = 0;
                 uploadQueue.forEach(it => {
                     allTotal += it.total || it.file.size || 1;
-                    allLoaded += it.loaded || 0;
+                    if (it.status === 'completed') {
+                        allLoaded += it.total || it.file.size || 1;
+                    } else if (it.status !== 'cancelled' && it.status !== 'error') {
+                        allLoaded += it.loaded || 0;
+                    }
                 });
                 const overallPct = allTotal > 0 ? Math.min(100, Math.round((allLoaded / allTotal) * 100)) : 0;
                 if (uploadOverallFill) uploadOverallFill.style.width = `${overallPct}%`;
@@ -846,11 +909,15 @@ async function processUploadQueue() {
                 }
             });
 
-            nextItem.status = 'completed';
-            nextItem.loaded = nextItem.total || nextItem.file.size;
+            if (nextItem.status !== 'cancelled') {
+                nextItem.status = 'completed';
+                nextItem.loaded = nextItem.total || nextItem.file.size;
+            }
         } catch (err) {
-            nextItem.status = 'error';
-            nextItem.errorMsg = err.message || 'Upload failed';
+            if (nextItem.status !== 'cancelled') {
+                nextItem.status = 'error';
+                nextItem.errorMsg = err.message || 'Upload failed';
+            }
         }
 
         renderUploadQueue();
@@ -885,11 +952,27 @@ function enqueueFiles(filesList, parentId) {
     processUploadQueue();
 }
 
+uploadProgressList?.addEventListener('click', event => {
+    const cancelBtn = event.target.closest('[data-cancel-id]');
+    if (cancelBtn) {
+        event.stopPropagation();
+        cancelUpload(cancelBtn.dataset.cancelId);
+    }
+});
+
 uploadProgressMinimize?.addEventListener('click', () => {
     uploadProgressPanel?.classList.toggle('collapsed');
 });
 
 uploadProgressClose?.addEventListener('click', () => {
+    uploadQueue.forEach(it => {
+        if (it.status === 'uploading' && it.xhr) {
+            it.status = 'cancelled';
+            try { it.xhr.abort(); } catch {}
+        } else if (it.status === 'pending') {
+            it.status = 'cancelled';
+        }
+    });
     if (uploadProgressPanel) {
         uploadProgressPanel.hidden = true;
     }

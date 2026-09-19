@@ -95,14 +95,14 @@ button, input {
 .auth-page::after {
     content: "";
     position: fixed;
-    left: -10vw;
-    bottom: -15vh;
-    width: 150vw;
-    height: 95vh;
-    background: linear-gradient(135deg, var(--mint-accent) 0%, var(--cyan-accent) 65%, #00a4e4 100%);
-    transform: rotate(-26deg);
-    transform-origin: left bottom;
-    border-top-left-radius: 48px;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--mint-accent) 0%, var(--cyan-accent) 55%, #0099ff 100%);
+    clip-path: polygon(0 92%, 100% 20%, 100% 100%, 0 100%);
     pointer-events: none;
     z-index: 0;
 }
@@ -934,6 +934,38 @@ button, input {
     text-overflow: ellipsis;
 }
 
+.upload-item-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.upload-item-cancel-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 0;
+    background: rgba(133, 148, 176, 0.15);
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, transform 0.1s;
+    padding: 0;
+}
+
+.upload-item-cancel-btn:hover {
+    color: #ffffff;
+    background: rgba(239, 68, 68, 0.4);
+}
+
+.upload-item-cancel-btn:active {
+    transform: scale(0.92);
+}
+
 .upload-item-status {
     font-size: 12px;
     font-weight: 700;
@@ -950,6 +982,11 @@ button, input {
 
 .upload-item-status.status-error {
     color: var(--danger-red);
+}
+
+.upload-item-status.status-cancelled {
+    color: var(--text-muted);
+    opacity: 0.8;
 }
 
 .upload-item-track {
@@ -972,6 +1009,11 @@ button, input {
 
 .upload-item-fill.error {
     background: var(--danger-red);
+}
+
+.upload-item-fill.cancelled {
+    background: var(--text-muted);
+    opacity: 0.4;
 }
 
 .upload-progress-panel.collapsed .upload-progress-body,
@@ -1549,10 +1591,7 @@ button, input {
     }
 
     .auth-page::after {
-        width: 75vw;
-        height: 50vh;
-        min-width: 220px;
-        min-height: 200px;
+        clip-path: polygon(0 84%, 100% 30%, 100% 100%, 0 100%);
     }
 
     .auth-shell {

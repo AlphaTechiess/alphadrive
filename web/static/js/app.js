@@ -40,6 +40,35 @@ const previewIcon = document.querySelector('#preview-icon');
 const previewDownloadBtn = document.querySelector('#preview-download-btn');
 const previewBody = document.querySelector('#preview-body');
 
+// Rename Modal elements
+const renameModal = document.querySelector('#rename-modal');
+const renameForm = document.querySelector('#rename-form');
+const renameInput = document.querySelector('#rename-input');
+const renameNodeIdInput = document.querySelector('#rename-node-id');
+const renameFormError = document.querySelector('#rename-form-error');
+const renameCloseBtn = document.querySelector('#rename-close');
+const renameCancelBtn = document.querySelector('#rename-cancel');
+
+// Conflict Modal elements
+const conflictModal = document.querySelector('#conflict-modal');
+const conflictFilenameEl = document.querySelector('#conflict-filename');
+const conflictNewnamePreview = document.querySelector('#conflict-newname-preview');
+const conflictReplaceBtn = document.querySelector('#conflict-replace-btn');
+const conflictRenameBtn = document.querySelector('#conflict-rename-btn');
+const conflictSkipBtn = document.querySelector('#conflict-skip-btn');
+const conflictCloseBtn = document.querySelector('#conflict-close');
+
+// Context Menu elements
+const contextMenu = document.querySelector('#context-menu');
+const ctxRename = document.querySelector('#ctx-rename');
+const ctxDownload = document.querySelector('#ctx-download');
+const ctxShare = document.querySelector('#ctx-share');
+const ctxInfo = document.querySelector('#ctx-info');
+const ctxTrash = document.querySelector('#ctx-trash');
+const ctxRestore = document.querySelector('#ctx-restore');
+const ctxDelete = document.querySelector('#ctx-delete');
+let contextTargetNodeId = null;
+
 // Selection set and application state
 const selection = new Set();
 let currentView = 'drive'; // 'drive' | 'trash'
@@ -89,14 +118,14 @@ function iconFor(node) {
     if (node.kind === 'folder') return 'folder.svg';
     const name = (node.name || '').toLowerCase();
     if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z|bz2|xz)$/.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma)$/.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|tiff?)$/.test(name)) return 'image.svg';
-    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/.test(name)) return 'code.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg)$/.test(name)) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/.test(name)) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/.test(name)) return 'sheet.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) return 'image.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name)) return 'code.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name)) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/i.test(name)) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name)) return 'sheet.svg';
     return 'files.svg';
 }
 
@@ -674,14 +703,14 @@ let isUploading = false;
 function iconForFilename(name) {
     name = (name || '').toLowerCase();
     if (name.endsWith('.pdf')) return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z|bz2|xz)$/.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma)$/.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|tiff?)$/.test(name)) return 'image.svg';
-    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/.test(name)) return 'code.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg)$/.test(name)) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/.test(name)) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/.test(name)) return 'sheet.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) return 'image.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name)) return 'code.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name)) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/i.test(name)) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name)) return 'sheet.svg';
     return 'files.svg';
 }
 
@@ -692,6 +721,12 @@ function uploadWithXHR(item, onProgress) {
         const form = new FormData();
         form.set('parent_id', item.parentId);
         form.set('file', item.file);
+        if (item.customName) {
+            form.set('name', item.customName);
+        }
+        if (item.replace) {
+            form.set('replace', 'true');
+        }
 
         xhr.open('POST', '/api/uploads', true);
         if (csrf) {
@@ -790,7 +825,8 @@ function renderUploadQueue() {
         }
 
         const pct = item.total > 0 ? Math.min(100, Math.round((item.loaded / item.total) * 100)) : 0;
-        const icon = iconForFilename(item.file.name);
+        const displayName = item.customName || item.file.name;
+        const icon = iconForFilename(displayName);
 
         const li = document.createElement('li');
         li.className = 'upload-item-row';
@@ -830,7 +866,7 @@ function renderUploadQueue() {
             <div class="upload-item-main">
                 <div class="upload-item-info">
                     <img src="/static/images/${icon}" alt="" class="upload-item-icon">
-                    <span class="upload-item-name" title="${esc(item.file.name)}">${esc(item.file.name)}</span>
+                    <span class="upload-item-name" title="${esc(displayName)}">${esc(displayName)}</span>
                 </div>
                 <div class="upload-item-side">
                     ${statusHtml}
@@ -933,21 +969,131 @@ async function processUploadQueue() {
     isUploading = false;
 }
 
-function enqueueFiles(filesList, parentId) {
+function generateUniqueFilename(name, existingNames) {
+    const lastDot = name.lastIndexOf('.');
+    let base = name;
+    let ext = '';
+    if (lastDot > 0) {
+        base = name.slice(0, lastDot);
+        ext = name.slice(lastDot);
+    }
+    let counter = 1;
+    let candidate = `${base} (${counter})${ext}`;
+    const nameSet = new Set(Array.from(existingNames).map(n => n.toLowerCase()));
+    while (nameSet.has(candidate.toLowerCase())) {
+        counter++;
+        candidate = `${base} (${counter})${ext}`;
+    }
+    return candidate;
+}
+
+function promptUploadConflict(file, suggestedName) {
+    return new Promise(resolve => {
+        if (!conflictModal) {
+            resolve({ action: 'rename', newName: suggestedName });
+            return;
+        }
+
+        if (conflictFilenameEl) conflictFilenameEl.textContent = file.name;
+        if (conflictNewnamePreview) conflictNewnamePreview.textContent = suggestedName;
+
+        const cleanup = () => {
+            conflictReplaceBtn?.removeEventListener('click', onReplace);
+            conflictRenameBtn?.removeEventListener('click', onRename);
+            conflictSkipBtn?.removeEventListener('click', onSkip);
+            conflictCloseBtn?.removeEventListener('click', onClose);
+            conflictModal?.removeEventListener('close', onClose);
+        };
+
+        const onReplace = () => {
+            cleanup();
+            conflictModal.close();
+            resolve({ action: 'replace' });
+        };
+
+        const onRename = () => {
+            cleanup();
+            conflictModal.close();
+            resolve({ action: 'rename', newName: suggestedName });
+        };
+
+        const onSkip = () => {
+            cleanup();
+            conflictModal.close();
+            resolve({ action: 'skip' });
+        };
+
+        const onClose = () => {
+            cleanup();
+            resolve({ action: 'skip' });
+        };
+
+        conflictReplaceBtn?.addEventListener('click', onReplace);
+        conflictRenameBtn?.addEventListener('click', onRename);
+        conflictSkipBtn?.addEventListener('click', onSkip);
+        conflictCloseBtn?.addEventListener('click', onClose);
+        conflictModal?.addEventListener('close', onClose, { once: true });
+
+        conflictModal.showModal();
+    });
+}
+
+async function enqueueFiles(filesList, parentId) {
     if (!filesList || !filesList.length) return;
+
+    const existingNames = new Set(nodes.filter(n => n.kind === 'file').map(n => n.name));
+    const itemsToEnqueue = [];
+
+    for (const file of filesList) {
+        const lowerName = (file.name || '').toLowerCase();
+        const hasConflict = currentView === 'drive' && parentId === currentParentId &&
+            Array.from(existingNames).some(n => n.toLowerCase() === lowerName);
+
+        if (hasConflict) {
+            const suggestedName = generateUniqueFilename(file.name, existingNames);
+            const decision = await promptUploadConflict(file, suggestedName);
+
+            if (decision.action === 'skip') {
+                continue;
+            } else if (decision.action === 'replace') {
+                itemsToEnqueue.push({
+                    file,
+                    parentId,
+                    replace: true,
+                });
+            } else if (decision.action === 'rename') {
+                existingNames.add(decision.newName);
+                itemsToEnqueue.push({
+                    file,
+                    parentId,
+                    customName: decision.newName,
+                });
+            }
+        } else {
+            existingNames.add(file.name);
+            itemsToEnqueue.push({
+                file,
+                parentId,
+            });
+        }
+    }
+
+    if (!itemsToEnqueue.length) return;
 
     if (uploadProgressPanel) {
         uploadProgressPanel.hidden = false;
         uploadProgressPanel.classList.remove('collapsed');
     }
 
-    for (const file of filesList) {
+    for (const item of itemsToEnqueue) {
         uploadQueue.push({
             id: 'up_' + Math.random().toString(36).slice(2, 9),
-            file: file,
-            parentId: parentId,
+            file: item.file,
+            parentId: item.parentId,
+            customName: item.customName,
+            replace: item.replace,
             loaded: 0,
-            total: file.size || 0,
+            total: item.file.size || 0,
             status: 'pending',
             errorMsg: '',
         });
@@ -1560,6 +1706,253 @@ formAddUser?.addEventListener('submit', async event => {
     }
 });
 
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+            if (existing.dataset.loaded === 'true') {
+                resolve();
+                return;
+            }
+            existing.addEventListener('load', () => resolve());
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        };
+        script.onerror = () => reject(new Error(`Failed to load script`));
+        document.head.appendChild(script);
+    });
+}
+
+function renderUnsupportedFallback(container, node, downloadUrl) {
+    container.innerHTML = `
+        <div class="preview-unsupported-box">
+            <img src="/static/images/${iconFor(node)}" alt="" class="preview-unsupported-icon">
+            <p class="preview-unsupported-name">${esc(node.name)}</p>
+            <p class="preview-unsupported-size">${formatBytes(node.size_bytes)}</p>
+            <p class="preview-unsupported-hint">Preview is not available for this file format.</p>
+            <a href="${downloadUrl}" download="${esc(node.name)}" class="btn-submit preview-download-cta">Download File</a>
+        </div>
+    `;
+}
+
+async function renderSpreadsheetPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Rendering spreadsheet…</p>';
+    if (typeof window.XLSX === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+    }
+    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetNames = workbook.SheetNames || [];
+    if (!sheetNames.length) {
+        container.innerHTML = '<div class="preview-spreadsheet-empty">This spreadsheet has no sheets.</div>';
+        return;
+    }
+
+    let activeSheetIdx = 0;
+
+    function renderCurrentSheet() {
+        const sheetName = sheetNames[activeSheetIdx];
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" is empty.</div>`;
+        }
+
+        const rawData = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (!rawData || !rawData.length) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
+        }
+
+        const maxRows = Math.min(rawData.length, 300);
+        let maxCols = 0;
+        for (let r = 0; r < maxRows; r++) {
+            if (rawData[r] && rawData[r].length > maxCols) {
+                maxCols = rawData[r].length;
+            }
+        }
+        maxCols = Math.min(maxCols, 50);
+
+        if (maxCols === 0) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
+        }
+
+        function getColLetter(colIdx) {
+            let letter = '';
+            let temp = colIdx;
+            while (temp >= 0) {
+                letter = String.fromCharCode((temp % 26) + 65) + letter;
+                temp = Math.floor(temp / 26) - 1;
+            }
+            return letter;
+        }
+
+        let tableHtml = '<table class="preview-spreadsheet-table"><thead><tr><th class="row-idx-th"></th>';
+        for (let c = 0; c < maxCols; c++) {
+            tableHtml += `<th>${getColLetter(c)}</th>`;
+        }
+        tableHtml += '</tr></thead><tbody>';
+
+        for (let r = 0; r < maxRows; r++) {
+            const rowData = rawData[r] || [];
+            tableHtml += `<tr><th class="row-idx-th">${r + 1}</th>`;
+            for (let c = 0; c < maxCols; c++) {
+                const cellVal = rowData[c] !== undefined && rowData[c] !== null ? String(rowData[c]) : '';
+                tableHtml += `<td title="${esc(cellVal)}">${esc(cellVal)}</td>`;
+            }
+            tableHtml += '</tr>';
+        }
+        tableHtml += '</tbody></table>';
+
+        if (rawData.length > maxRows) {
+            tableHtml += `<div class="preview-spreadsheet-notice">Showing first ${maxRows} of ${rawData.length} rows</div>`;
+        }
+
+        return tableHtml;
+    }
+
+    function buildUI() {
+        let tabsHtml = '';
+        if (sheetNames.length > 1) {
+            tabsHtml = `<div class="preview-sheet-tabs">` + sheetNames.map((name, idx) => {
+                return `<button type="button" class="preview-sheet-tab ${idx === activeSheetIdx ? 'active' : ''}" data-sheet-idx="${idx}">${esc(name)}</button>`;
+            }).join('') + `</div>`;
+        }
+
+        container.innerHTML = `
+            <div class="preview-spreadsheet-container">
+                ${tabsHtml}
+                <div class="preview-sheet-table-wrap">
+                    ${renderCurrentSheet()}
+                </div>
+            </div>
+        `;
+
+        if (sheetNames.length > 1) {
+            const tabBtns = container.querySelectorAll('.preview-sheet-tab');
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeSheetIdx = parseInt(btn.dataset.sheetIdx, 10) || 0;
+                    buildUI();
+                });
+            });
+        }
+    }
+
+    buildUI();
+}
+
+async function renderDocxPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Rendering document…</p>';
+    if (typeof window.mammoth === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+    }
+    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+    const html = (result && result.value) || '';
+    if (!html.trim()) {
+        container.innerHTML = `
+            <div class="preview-doc-wrapper">
+                <div class="preview-doc-container">
+                    <p style="color: #666; font-style: italic;">This document appears to be empty.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="preview-doc-wrapper">
+            <div class="preview-doc-container">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
+async function renderZipPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Reading archive…</p>';
+    if (typeof window.JSZip === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    }
+    const zip = await window.JSZip.loadAsync(arrayBuffer);
+    const files = [];
+    zip.forEach((relativePath, zipEntry) => {
+        files.push({
+            name: relativePath,
+            isDir: zipEntry.dir,
+            date: zipEntry.date,
+            size: zipEntry._data ? zipEntry._data.uncompressedSize : 0,
+        });
+    });
+
+    if (!files.length) {
+        container.innerHTML = '<div class="preview-spreadsheet-empty">Zip archive is empty.</div>';
+        return;
+    }
+
+    files.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    let rowsHtml = '';
+    files.forEach(f => {
+        const icon = f.isDir ? 'folder.svg' : iconForFilename(f.name);
+        rowsHtml += `
+            <tr>
+                <td>
+                    <div class="preview-archive-item">
+                        <img src="/static/images/${icon}" alt="" class="preview-archive-icon">
+                        <span title="${esc(f.name)}">${esc(f.name)}</span>
+                    </div>
+                </td>
+                <td style="text-align: right; color: var(--text-muted);">${f.isDir ? '-' : formatBytes(f.size)}</td>
+                <td style="color: var(--text-muted);">${f.date ? formatDate(f.date) : '-'}</td>
+            </tr>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="preview-archive-container">
+            <div class="preview-archive-header">
+                <span>${files.length} item${files.length > 1 ? 's' : ''} in archive</span>
+            </div>
+            <div class="preview-archive-table-wrap">
+                <table class="preview-archive-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th style="text-align: right; width: 110px;">Size</th>
+                            <th style="width: 170px;">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+async function renderMarkdownPreview(container, text) {
+    if (typeof window.marked === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
+    }
+    const html = window.marked.parse(text);
+    container.innerHTML = `
+        <div class="preview-doc-wrapper">
+            <div class="preview-doc-container">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
 // File preview implementation
 async function openPreview(node) {
     if (!node || !previewModal) return;
@@ -1570,6 +1963,7 @@ async function openPreview(node) {
         previewDownloadBtn.setAttribute('download', node.name || 'download');
     }
 
+    const downloadUrl = `/api/files/${encodeURIComponent(node.id)}/download`;
     const viewUrl = `/api/files/${encodeURIComponent(node.id)}/view`;
     const mime = (node.mime_type || '').toLowerCase();
     const name = (node.name || '').toLowerCase();
@@ -1579,11 +1973,11 @@ async function openPreview(node) {
     }
     previewModal.showModal();
 
-    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|ico|bmp)$/.test(name)) {
+    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) {
         previewBody.innerHTML = `<img class="preview-media" src="${viewUrl}" alt="${esc(node.name)}">`;
-    } else if (mime.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi)$/.test(name)) {
+    } else if (mime.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) {
         previewBody.innerHTML = `<video class="preview-video" controls autoplay playsinline src="${viewUrl}"></video>`;
-    } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac)$/.test(name)) {
+    } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) {
         previewBody.innerHTML = `
             <div class="preview-audio-container">
                 <img src="/static/images/audio.svg" alt="" class="preview-audio-banner">
@@ -1593,12 +1987,56 @@ async function openPreview(node) {
         `;
     } else if (mime === 'application/pdf' || name.endsWith('.pdf')) {
         previewBody.innerHTML = `<iframe class="preview-frame" src="${viewUrl}" title="${esc(node.name)}"></iframe>`;
+    } else if (/\.(xlsx?|ods|csv|tsv)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime === 'text/csv' || mime === 'text/tab-separated-values') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load spreadsheet');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderSpreadsheetPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('Spreadsheet preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.docx$/i.test(name) || mime.includes('wordprocessingml')) {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load document');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderDocxPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('DOCX preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.zip$/i.test(name) || mime === 'application/zip' || mime === 'application/x-zip-compressed') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load zip archive');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderZipPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('ZIP preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.(md|markdown)$/i.test(name) || mime === 'text/markdown') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load markdown');
+            const text = await resp.text();
+            await renderMarkdownPreview(previewBody, text);
+        } catch (err) {
+            console.error('Markdown preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
     } else if (
-        mime.startsWith('text/') ||
-        mime.includes('json') ||
-        mime.includes('javascript') ||
-        mime.includes('xml') ||
-        /\.(txt|md|json|js|ts|html|css|go|py|rs|c|cpp|h|sh|bat|ps1|yaml|yml|toml|env|sql|log|csv|tsv|ini|xml)$/.test(name)
+        !/\.(docx?|xlsx?|pptx?|odt|ods|odp|zip|tar|gz|rar|7z|bz2|xz|iso|bin|exe|dll|dmg|pkg|apk|deb|rpm|epub|psd|ai|key|pages|numbers)$/i.test(name) &&
+        (
+            mime.startsWith('text/') ||
+            mime === 'application/json' ||
+            mime === 'application/javascript' ||
+            mime === 'application/xml' ||
+            mime === 'text/xml' ||
+            /\.(txt|json|js|ts|jsx|tsx|html?|css|scss|sass|less|go|py|rs|c|cpp|h|hpp|cs|java|kt|swift|php|rb|sh|bash|zsh|bat|ps1|ya?ml|toml|env|sql|log|ini|conf|cfg|xml|svg)$/i.test(name)
+        )
     ) {
         try {
             const resp = await fetch(viewUrl);
@@ -1610,15 +2048,7 @@ async function openPreview(node) {
             previewBody.innerHTML = `<p class="grid-status">Unable to display text preview: ${esc(e.message)}</p>`;
         }
     } else {
-        previewBody.innerHTML = `
-            <div class="preview-unsupported-box">
-                <img src="/static/images/${iconFor(node)}" alt="" class="preview-unsupported-icon">
-                <p class="preview-unsupported-name">${esc(node.name)}</p>
-                <p class="preview-unsupported-size">${formatBytes(node.size_bytes)}</p>
-                <p class="preview-unsupported-hint">Preview is not available for this file format.</p>
-                <a href="/api/files/${encodeURIComponent(node.id)}/download" download="${esc(node.name)}" class="btn-submit preview-download-cta">Download File</a>
-            </div>
-        `;
+        renderUnsupportedFallback(previewBody, node, downloadUrl);
     }
 }
 
@@ -1639,6 +2069,194 @@ previewModal?.addEventListener('click', event => {
     }
 });
 
+// ==========================================================================
+// Rename Modal Logic
+// ==========================================================================
+
+function openRename(nodeId) {
+    if (!nodeId || !renameModal) return;
+    const node = nodes.find(n => n.id === nodeId);
+    if (renameNodeIdInput) renameNodeIdInput.value = nodeId;
+    if (renameInput) {
+        renameInput.value = node ? node.name : '';
+    }
+    if (renameFormError) {
+        renameFormError.textContent = '';
+        renameFormError.style.display = 'none';
+    }
+    renameModal.showModal();
+    if (renameInput) {
+        renameInput.focus();
+        const val = renameInput.value;
+        const lastDot = val.lastIndexOf('.');
+        if (lastDot > 0 && node?.kind === 'file') {
+            renameInput.setSelectionRange(0, lastDot);
+        } else {
+            renameInput.select();
+        }
+    }
+}
+
+renameForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const nodeId = renameNodeIdInput?.value;
+    const newName = (renameInput?.value || '').trim();
+    if (!nodeId || !newName) return;
+
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && node.name === newName) {
+        renameModal.close();
+        return;
+    }
+
+    try {
+        await api(`/api/nodes/${encodeURIComponent(nodeId)}/rename`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName }),
+        });
+        renameModal.close();
+        showNotice(`Renamed to "${newName}"`);
+        loadFolder(currentParentId);
+    } catch (err) {
+        if (renameFormError) {
+            renameFormError.textContent = err.message || 'Failed to rename item';
+            renameFormError.style.display = 'block';
+        } else {
+            showNotice(err.message, true);
+        }
+    }
+});
+
+renameCloseBtn?.addEventListener('click', () => renameModal?.close());
+renameCancelBtn?.addEventListener('click', () => renameModal?.close());
+renameModal?.addEventListener('click', event => {
+    if (event.target === renameModal) {
+        renameModal.close();
+    }
+});
+
+// ==========================================================================
+// Right-Click Context Menu Logic
+// ==========================================================================
+
+function hideContextMenu() {
+    if (contextMenu && !contextMenu.hidden) {
+        contextMenu.hidden = true;
+        contextTargetNodeId = null;
+    }
+}
+
+function showContextMenu(x, y, targetNodeId) {
+    if (!contextMenu) return;
+    contextTargetNodeId = targetNodeId;
+    const node = nodes.find(n => n.id === targetNodeId);
+    if (!node) return;
+
+    if (!selection.has(targetNodeId)) {
+        selection.clear();
+        selection.add(targetNodeId);
+        updateSelectionBar();
+    }
+
+    if (currentView === 'trash') {
+        if (ctxRename) ctxRename.hidden = true;
+        if (ctxDownload) ctxDownload.hidden = false;
+        if (ctxShare) ctxShare.hidden = true;
+        if (ctxInfo) ctxInfo.hidden = false;
+        if (ctxTrash) ctxTrash.hidden = true;
+        if (ctxRestore) ctxRestore.hidden = false;
+        if (ctxDelete) ctxDelete.hidden = false;
+    } else {
+        if (ctxRename) ctxRename.hidden = false;
+        if (ctxDownload) ctxDownload.hidden = false;
+        if (ctxShare) ctxShare.hidden = false;
+        if (ctxInfo) ctxInfo.hidden = false;
+        if (ctxTrash) ctxTrash.hidden = false;
+        if (ctxRestore) ctxRestore.hidden = true;
+        if (ctxDelete) ctxDelete.hidden = true;
+    }
+
+    contextMenu.hidden = false;
+
+    // Viewport bounding
+    const menuWidth = contextMenu.offsetWidth || 190;
+    const menuHeight = contextMenu.offsetHeight || 220;
+    const winWidth = window.innerWidth;
+    const winHeight = window.innerHeight;
+
+    let posX = x;
+    let posY = y;
+
+    if (posX + menuWidth > winWidth - 10) {
+        posX = winWidth - menuWidth - 10;
+    }
+    if (posY + menuHeight > winHeight - 10) {
+        posY = winHeight - menuHeight - 10;
+    }
+    if (posX < 10) posX = 10;
+    if (posY < 10) posY = 10;
+
+    contextMenu.style.left = `${posX}px`;
+    contextMenu.style.top = `${posY}px`;
+}
+
+list.addEventListener('contextmenu', event => {
+    const card = event.target.closest('.file-card');
+    if (card && card.dataset.id) {
+        event.preventDefault();
+        showContextMenu(event.clientX, event.clientY, card.dataset.id);
+    }
+});
+
+window.addEventListener('click', event => {
+    if (contextMenu && !contextMenu.contains(event.target)) {
+        hideContextMenu();
+    }
+});
+window.addEventListener('scroll', hideContextMenu, true);
+window.addEventListener('resize', hideContextMenu);
+
+ctxRename?.addEventListener('click', () => {
+    const id = contextTargetNodeId || Array.from(selection)[0];
+    hideContextMenu();
+    if (id) openRename(id);
+});
+
+ctxDownload?.addEventListener('click', () => {
+    hideContextMenu();
+    if (selection.size > 0) {
+        downloadNodes(Array.from(selection));
+    } else if (contextTargetNodeId) {
+        downloadNodes([contextTargetNodeId]);
+    }
+});
+
+ctxShare?.addEventListener('click', () => {
+    hideContextMenu();
+    openSelectedShare();
+});
+
+ctxInfo?.addEventListener('click', () => {
+    hideContextMenu();
+    openSelectedInfo();
+});
+
+ctxTrash?.addEventListener('click', () => {
+    hideContextMenu();
+    document.querySelector('#trash-selected')?.click();
+});
+
+ctxRestore?.addEventListener('click', () => {
+    hideContextMenu();
+    document.querySelector('#restore-selected')?.click();
+});
+
+ctxDelete?.addEventListener('click', () => {
+    hideContextMenu();
+    document.querySelector('#delete-selected')?.click();
+});
+
 // Rectangular Click & Drag (Marquee / Lasso) Selection
 function initMarqueeSelection() {
     const marquee = document.querySelector('#selection-marquee');
@@ -1657,6 +2275,7 @@ function initMarqueeSelection() {
         if (
             target.closest('.file-card') ||
             target.closest('.bottom-action-bar') ||
+            target.closest('.context-menu') ||
             target.closest('.desktop-sidebar') ||
             target.closest('.desktop-header') ||
             target.closest('.mobile-header') ||
@@ -1769,17 +2388,145 @@ window.addEventListener('popstate', () => {
     }
 });
 
-// Global Escape handler
+// Global Keyboard Shortcuts (Escape, Delete, Backspace)
 window.addEventListener('keydown', event => {
+    const activeEl = document.activeElement;
+    const isEditing = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT' ||
+        activeEl.isContentEditable
+    );
+
     if (event.key === 'Escape') {
+        hideContextMenu();
         closeUploadMenu();
         if (selection.size) {
             selection.clear();
             updateSelectionBar();
         }
         closePreview();
+        return;
+    }
+
+    if ((event.key === 'Delete' || event.key === 'Backspace') && !isEditing) {
+        const anyModalOpen = document.querySelector('dialog[open]');
+        if (anyModalOpen) return;
+
+        if (selection.size > 0) {
+            event.preventDefault();
+            if (currentView === 'trash') {
+                document.querySelector('#delete-selected')?.click();
+            } else {
+                document.querySelector('#trash-selected')?.click();
+            }
+        }
     }
 });
+
+// Drag & Drop Upload Engine
+const dropOverlay = document.querySelector('#drag-drop-overlay');
+let dragCounter = 0;
+
+function isFilesDrag(event) {
+    if (!event.dataTransfer || !event.dataTransfer.types) return false;
+    for (let i = 0; i < event.dataTransfer.types.length; i++) {
+        if (event.dataTransfer.types[i] === 'Files') return true;
+    }
+    return false;
+}
+
+window.addEventListener('dragenter', event => {
+    if (!isFilesDrag(event)) return;
+    event.preventDefault();
+    dragCounter++;
+    if (currentView === 'drive' && dropOverlay) {
+        dropOverlay.hidden = false;
+    }
+});
+
+window.addEventListener('dragover', event => {
+    if (!isFilesDrag(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = currentView === 'drive' ? 'copy' : 'none';
+});
+
+window.addEventListener('dragleave', event => {
+    if (!isFilesDrag(event)) return;
+    event.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+        dragCounter = 0;
+        if (dropOverlay) dropOverlay.hidden = true;
+    }
+});
+
+window.addEventListener('drop', async event => {
+    if (!isFilesDrag(event)) return;
+    event.preventDefault();
+    dragCounter = 0;
+    if (dropOverlay) dropOverlay.hidden = true;
+
+    if (currentView !== 'drive') {
+        showNotice('Cannot upload files into the Trash.', true);
+        return;
+    }
+
+    const dt = event.dataTransfer;
+    if (!dt) return;
+
+    const items = dt.items;
+    if (items && items.length > 0 && typeof items[0].webkitGetAsEntry === 'function') {
+        const filesToUpload = [];
+        const entryPromises = [];
+
+        for (let i = 0; i < items.length; i++) {
+            const entry = items[i].webkitGetAsEntry();
+            if (entry) {
+                entryPromises.push(scanEntry(entry, filesToUpload));
+            }
+        }
+
+        await Promise.all(entryPromises);
+        if (filesToUpload.length > 0) {
+            enqueueFiles(filesToUpload, currentParentId);
+            return;
+        }
+    }
+
+    if (dt.files && dt.files.length > 0) {
+        const filesToUpload = Array.from(dt.files);
+        enqueueFiles(filesToUpload, currentParentId);
+    }
+});
+
+async function scanEntry(entry, fileList) {
+    if (entry.isFile) {
+        return new Promise(resolve => {
+            entry.file(file => {
+                fileList.push(file);
+                resolve();
+            }, () => resolve());
+        });
+    } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        return new Promise(resolve => {
+            const readEntries = () => {
+                dirReader.readEntries(async entries => {
+                    if (!entries.length) {
+                        resolve();
+                    } else {
+                        for (const child of entries) {
+                            await scanEntry(child, fileList);
+                        }
+                        readEntries();
+                    }
+                }, () => resolve());
+            };
+            readEntries();
+        });
+    }
+}
 
 // Initial boot
 initMarqueeSelection();

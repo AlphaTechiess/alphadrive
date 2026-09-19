@@ -245,6 +245,10 @@ func (s *Service) CreateFolder(ctx context.Context, userID, parentID, name, id s
 }
 
 func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id string, src io.Reader, max int64) (Node, error) {
+	return s.UploadWithOptions(ctx, userID, parentID, filename, id, src, max, false)
+}
+
+func (s *Service) UploadWithOptions(ctx context.Context, userID, parentID, filename, id string, src io.Reader, max int64, replace bool) (Node, error) {
 	filename, err := validation.Name(filename)
 	if err != nil {
 		return Node{}, err
@@ -291,6 +295,23 @@ func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id str
 			mt = "application/octet-stream"
 		}
 	}
+
+	if replace {
+		var existingID, oldStorageKey string
+		err := s.db.QueryRowContext(ctx, `SELECT id, storage_key FROM nodes WHERE user_id=? AND parent_id=? AND name=? AND kind='file' AND trashed_at IS NULL`, userID, parentID, filename).Scan(&existingID, &oldStorageKey)
+		if err == nil && existingID != "" {
+			_, err = s.db.ExecContext(ctx, `UPDATE nodes SET storage_key=?, mime_type=?, size_bytes=?, updated_at=? WHERE id=? AND user_id=?`, storageKey, mt, written, t, existingID, userID)
+			if err != nil {
+				_ = os.Remove(final)
+				return Node{}, err
+			}
+			if oldStorageKey != "" && oldStorageKey != storageKey {
+				_ = os.Remove(filepath.Join(s.objects, oldStorageKey))
+			}
+			return s.Get(ctx, userID, existingID)
+		}
+	}
+
 	_, err = s.db.ExecContext(ctx, `INSERT INTO nodes(id,user_id,parent_id,kind,name,storage_key,mime_type,size_bytes,created_at,updated_at) VALUES(?,?,?,'file',?,?,?,?,?,?)`, id, userID, parentID, filename, storageKey, mt, written, t, t)
 	if err != nil {
 		_ = os.Remove(final)
@@ -306,6 +327,31 @@ func (s *Service) Upload(ctx context.Context, userID, parentID, filename, id str
 		CreatedAt: time.Unix(t, 0).UTC(),
 		UpdatedAt: time.Unix(t, 0).UTC(),
 	}, nil
+}
+
+func (s *Service) Rename(ctx context.Context, userID, id, newName string) (Node, error) {
+	newName, err := validation.Name(newName)
+	if err != nil {
+		return Node{}, err
+	}
+	root := rootID(userID)
+	if id == root {
+		return Node{}, errors.New("cannot rename root folder")
+	}
+
+	t := now()
+	res, err := s.db.ExecContext(ctx, `UPDATE nodes SET name=?, updated_at=? WHERE id=? AND user_id=? AND trashed_at IS NULL AND id != ?`, newName, t, id, userID, root)
+	if err != nil {
+		return Node{}, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return Node{}, err
+	}
+	if affected == 0 {
+		return Node{}, ErrNotFound
+	}
+	return s.Get(ctx, userID, id)
 }
 
 func (s *Service) OpenDownload(ctx context.Context, userID, id string) (*os.File, Node, error) {

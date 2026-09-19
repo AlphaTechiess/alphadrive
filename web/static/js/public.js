@@ -60,14 +60,14 @@ function iconFor(node) {
     if (node.kind === 'folder') return 'folder.svg';
     const name = (node.name || '').toLowerCase();
     if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z|bz2|xz)$/.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma)$/.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|tiff?)$/.test(name)) return 'image.svg';
-    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/.test(name)) return 'code.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg)$/.test(name)) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/.test(name)) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/.test(name)) return 'sheet.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) return 'image.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name)) return 'code.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name)) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/i.test(name)) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name)) return 'sheet.svg';
     return 'files.svg';
 }
 
@@ -270,6 +270,253 @@ infoModal?.addEventListener('click', event => {
     if (event.target === infoModal) infoModal.close();
 });
 
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+            if (existing.dataset.loaded === 'true') {
+                resolve();
+                return;
+            }
+            existing.addEventListener('load', () => resolve());
+            existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        };
+        script.onerror = () => reject(new Error(`Failed to load script`));
+        document.head.appendChild(script);
+    });
+}
+
+function renderUnsupportedFallback(container, node, downloadUrl) {
+    container.innerHTML = `
+        <div class="preview-unsupported-box">
+            <img src="/static/images/${iconFor(node)}" alt="" class="preview-unsupported-icon">
+            <p class="preview-unsupported-name">${esc(node.name)}</p>
+            <p class="preview-unsupported-size">${formatBytes(node.size_bytes)}</p>
+            <p class="preview-unsupported-hint">Preview is not available for this file format.</p>
+            <a href="${downloadUrl}" download="${esc(node.name)}" class="btn-submit preview-download-cta">Download File</a>
+        </div>
+    `;
+}
+
+async function renderSpreadsheetPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Rendering spreadsheet…</p>';
+    if (typeof window.XLSX === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+    }
+    const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetNames = workbook.SheetNames || [];
+    if (!sheetNames.length) {
+        container.innerHTML = '<div class="preview-spreadsheet-empty">This spreadsheet has no sheets.</div>';
+        return;
+    }
+
+    let activeSheetIdx = 0;
+
+    function renderCurrentSheet() {
+        const sheetName = sheetNames[activeSheetIdx];
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" is empty.</div>`;
+        }
+
+        const rawData = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        if (!rawData || !rawData.length) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
+        }
+
+        const maxRows = Math.min(rawData.length, 300);
+        let maxCols = 0;
+        for (let r = 0; r < maxRows; r++) {
+            if (rawData[r] && rawData[r].length > maxCols) {
+                maxCols = rawData[r].length;
+            }
+        }
+        maxCols = Math.min(maxCols, 50);
+
+        if (maxCols === 0) {
+            return `<div class="preview-spreadsheet-empty">Sheet "${esc(sheetName)}" has no data.</div>`;
+        }
+
+        function getColLetter(colIdx) {
+            let letter = '';
+            let temp = colIdx;
+            while (temp >= 0) {
+                letter = String.fromCharCode((temp % 26) + 65) + letter;
+                temp = Math.floor(temp / 26) - 1;
+            }
+            return letter;
+        }
+
+        let tableHtml = '<table class="preview-spreadsheet-table"><thead><tr><th class="row-idx-th"></th>';
+        for (let c = 0; c < maxCols; c++) {
+            tableHtml += `<th>${getColLetter(c)}</th>`;
+        }
+        tableHtml += '</tr></thead><tbody>';
+
+        for (let r = 0; r < maxRows; r++) {
+            const rowData = rawData[r] || [];
+            tableHtml += `<tr><th class="row-idx-th">${r + 1}</th>`;
+            for (let c = 0; c < maxCols; c++) {
+                const cellVal = rowData[c] !== undefined && rowData[c] !== null ? String(rowData[c]) : '';
+                tableHtml += `<td title="${esc(cellVal)}">${esc(cellVal)}</td>`;
+            }
+            tableHtml += '</tr>';
+        }
+        tableHtml += '</tbody></table>';
+
+        if (rawData.length > maxRows) {
+            tableHtml += `<div class="preview-spreadsheet-notice">Showing first ${maxRows} of ${rawData.length} rows</div>`;
+        }
+
+        return tableHtml;
+    }
+
+    function buildUI() {
+        let tabsHtml = '';
+        if (sheetNames.length > 1) {
+            tabsHtml = `<div class="preview-sheet-tabs">` + sheetNames.map((name, idx) => {
+                return `<button type="button" class="preview-sheet-tab ${idx === activeSheetIdx ? 'active' : ''}" data-sheet-idx="${idx}">${esc(name)}</button>`;
+            }).join('') + `</div>`;
+        }
+
+        container.innerHTML = `
+            <div class="preview-spreadsheet-container">
+                ${tabsHtml}
+                <div class="preview-sheet-table-wrap">
+                    ${renderCurrentSheet()}
+                </div>
+            </div>
+        `;
+
+        if (sheetNames.length > 1) {
+            const tabBtns = container.querySelectorAll('.preview-sheet-tab');
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeSheetIdx = parseInt(btn.dataset.sheetIdx, 10) || 0;
+                    buildUI();
+                });
+            });
+        }
+    }
+
+    buildUI();
+}
+
+async function renderDocxPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Rendering document…</p>';
+    if (typeof window.mammoth === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+    }
+    const result = await window.mammoth.convertToHtml({ arrayBuffer });
+    const html = (result && result.value) || '';
+    if (!html.trim()) {
+        container.innerHTML = `
+            <div class="preview-doc-wrapper">
+                <div class="preview-doc-container">
+                    <p style="color: #666; font-style: italic;">This document appears to be empty.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="preview-doc-wrapper">
+            <div class="preview-doc-container">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
+async function renderZipPreview(container, arrayBuffer) {
+    container.innerHTML = '<p class="grid-status">Reading archive…</p>';
+    if (typeof window.JSZip === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    }
+    const zip = await window.JSZip.loadAsync(arrayBuffer);
+    const files = [];
+    zip.forEach((relativePath, zipEntry) => {
+        files.push({
+            name: relativePath,
+            isDir: zipEntry.dir,
+            date: zipEntry.date,
+            size: zipEntry._data ? zipEntry._data.uncompressedSize : 0,
+        });
+    });
+
+    if (!files.length) {
+        container.innerHTML = '<div class="preview-spreadsheet-empty">Zip archive is empty.</div>';
+        return;
+    }
+
+    files.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    let rowsHtml = '';
+    files.forEach(f => {
+        const icon = f.isDir ? 'folder.svg' : iconFor({ name: f.name, kind: 'file' });
+        rowsHtml += `
+            <tr>
+                <td>
+                    <div class="preview-archive-item">
+                        <img src="/static/images/${icon}" alt="" class="preview-archive-icon">
+                        <span title="${esc(f.name)}">${esc(f.name)}</span>
+                    </div>
+                </td>
+                <td style="text-align: right; color: var(--text-muted);">${f.isDir ? '-' : formatBytes(f.size)}</td>
+                <td style="color: var(--text-muted);">${f.date ? formatDate(f.date) : '-'}</td>
+            </tr>
+        `;
+    });
+
+    container.innerHTML = `
+        <div class="preview-archive-container">
+            <div class="preview-archive-header">
+                <span>${files.length} item${files.length > 1 ? 's' : ''} in archive</span>
+            </div>
+            <div class="preview-archive-table-wrap">
+                <table class="preview-archive-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th style="text-align: right; width: 110px;">Size</th>
+                            <th style="width: 170px;">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+async function renderMarkdownPreview(container, text) {
+    if (typeof window.marked === 'undefined') {
+        await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
+    }
+    const html = window.marked.parse(text);
+    container.innerHTML = `
+        <div class="preview-doc-wrapper">
+            <div class="preview-doc-container">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
 // File Preview
 async function openPreview(node) {
     if (!node || !previewModal) return;
@@ -280,6 +527,7 @@ async function openPreview(node) {
         previewDownloadBtn.setAttribute('download', node.name || 'download');
     }
 
+    const downloadUrl = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/download`;
     const viewUrl = `/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/view`;
     const mime = (node.mime_type || '').toLowerCase();
     const name = (node.name || '').toLowerCase();
@@ -287,11 +535,11 @@ async function openPreview(node) {
     if (previewBody) previewBody.innerHTML = '<p class="grid-status">Loading preview…</p>';
     previewModal.showModal();
 
-    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|ico|bmp)$/.test(name)) {
+    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) {
         previewBody.innerHTML = `<img class="preview-media" src="${viewUrl}" alt="${esc(node.name)}">`;
-    } else if (mime.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi)$/.test(name)) {
+    } else if (mime.startsWith('video/') || /\.(mp4|webm|mkv|mov|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) {
         previewBody.innerHTML = `<video class="preview-video" controls autoplay playsinline src="${viewUrl}"></video>`;
-    } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac)$/.test(name)) {
+    } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) {
         previewBody.innerHTML = `
             <div class="preview-audio-container">
                 <img src="/static/images/audio.svg" alt="" class="preview-audio-banner">
@@ -301,12 +549,56 @@ async function openPreview(node) {
         `;
     } else if (mime === 'application/pdf' || name.endsWith('.pdf')) {
         previewBody.innerHTML = `<iframe class="preview-frame" src="${viewUrl}" title="${esc(node.name)}"></iframe>`;
+    } else if (/\.(xlsx?|ods|csv|tsv)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime === 'text/csv' || mime === 'text/tab-separated-values') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load spreadsheet');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderSpreadsheetPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('Spreadsheet preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.docx$/i.test(name) || mime.includes('wordprocessingml')) {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load document');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderDocxPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('DOCX preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.zip$/i.test(name) || mime === 'application/zip' || mime === 'application/x-zip-compressed') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load zip archive');
+            const arrayBuffer = await resp.arrayBuffer();
+            await renderZipPreview(previewBody, arrayBuffer);
+        } catch (err) {
+            console.error('ZIP preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
+    } else if (/\.(md|markdown)$/i.test(name) || mime === 'text/markdown') {
+        try {
+            const resp = await fetch(viewUrl);
+            if (!resp.ok) throw new Error('Could not load markdown');
+            const text = await resp.text();
+            await renderMarkdownPreview(previewBody, text);
+        } catch (err) {
+            console.error('Markdown preview failed:', err);
+            renderUnsupportedFallback(previewBody, node, downloadUrl);
+        }
     } else if (
-        mime.startsWith('text/') ||
-        mime.includes('json') ||
-        mime.includes('javascript') ||
-        mime.includes('xml') ||
-        /\.(txt|md|json|js|ts|html|css|go|py|rs|c|cpp|h|sh|bat|ps1|yaml|yml|toml|env|sql|log|csv|tsv|ini|xml)$/.test(name)
+        !/\.(docx?|xlsx?|pptx?|odt|ods|odp|zip|tar|gz|rar|7z|bz2|xz|iso|bin|exe|dll|dmg|pkg|apk|deb|rpm|epub|psd|ai|key|pages|numbers)$/i.test(name) &&
+        (
+            mime.startsWith('text/') ||
+            mime === 'application/json' ||
+            mime === 'application/javascript' ||
+            mime === 'application/xml' ||
+            mime === 'text/xml' ||
+            /\.(txt|json|js|ts|jsx|tsx|html?|css|scss|sass|less|go|py|rs|c|cpp|h|hpp|cs|java|kt|swift|php|rb|sh|bash|zsh|bat|ps1|ya?ml|toml|env|sql|log|ini|conf|cfg|xml|svg)$/i.test(name)
+        )
     ) {
         try {
             const resp = await fetch(viewUrl);
@@ -318,14 +610,7 @@ async function openPreview(node) {
             previewBody.innerHTML = `<p class="grid-status">Unable to display text preview: ${esc(e.message)}</p>`;
         }
     } else {
-        previewBody.innerHTML = `
-            <div class="preview-unsupported-box">
-                <img src="/static/images/${iconFor(node)}" alt="" class="preview-unsupported-icon">
-                <p class="preview-unsupported-name">${esc(node.name)}</p>
-                <p class="preview-unsupported-size">${formatBytes(node.size_bytes)}</p>
-                <a href="/s/${encodeURIComponent(slug)}/files/${encodeURIComponent(node.id)}/download" download="${esc(node.name)}" class="btn-submit preview-download-cta">Download File</a>
-            </div>
-        `;
+        renderUnsupportedFallback(previewBody, node, downloadUrl);
     }
 }
 

@@ -96,6 +96,15 @@
         <!-- Marquee Drag Selection Box -->
         <div id="selection-marquee" class="selection-marquee" hidden></div>
 
+        <!-- Full Window Drag & Drop Upload Overlay -->
+        <div id="drag-drop-overlay" class="drag-drop-overlay" hidden aria-hidden="true">
+            <div class="drag-drop-box">
+                <img src="/static/images/uploadicon.svg" alt="" class="drag-drop-icon">
+                <h3 class="drag-drop-title">Drop files to upload</h3>
+                <p class="drag-drop-subtitle">Upload directly into current folder</p>
+            </div>
+        </div>
+
         <div id="notice" class="drive-notice" hidden></div>
 
         <!-- File & Folder Grid -->
@@ -121,6 +130,42 @@
             <span>New folder</span>
         </button>
     </section>
+
+    <!-- Custom Right-Click Context Menu -->
+    <div id="context-menu" class="context-menu" hidden>
+        <button id="ctx-rename" type="button" class="context-menu-item">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span>Rename it</span>
+        </button>
+        <button id="ctx-download" type="button" class="context-menu-item">
+            <img src="/static/images/download.svg" alt="">
+            <span>Download</span>
+        </button>
+        <button id="ctx-link" type="button" class="context-menu-item">
+            <img src="/static/images/link.svg" alt="">
+            <span>Get link</span>
+        </button>
+        <button id="ctx-info" type="button" class="context-menu-item">
+            <img src="/static/images/info.svg" alt="">
+            <span>Details</span>
+        </button>
+        <div class="context-menu-sep"></div>
+        <button id="ctx-trash" type="button" class="context-menu-item danger">
+            <img src="/static/images/bin.svg" alt="">
+            <span>Move to trash</span>
+        </button>
+        <button id="ctx-restore" type="button" class="context-menu-item" hidden>
+            <img src="/static/images/restore.svg" alt="">
+            <span>Restore</span>
+        </button>
+        <button id="ctx-delete-perm" type="button" class="context-menu-item danger" hidden>
+            <img src="/static/images/bin.svg" alt="">
+            <span>Delete permanently</span>
+        </button>
+    </div>
 
     <!-- My Drive Bottom Action Bar -->
     <aside id="drive-action-bar" class="bottom-action-bar bottom-action-bar-drive" aria-label="Drive selection actions">
@@ -400,6 +445,95 @@
                 </div>
             </div>
             <div id="preview-body" class="preview-body"></div>
+        </div>
+    </dialog>
+
+    <!-- Right-Click Context Menu -->
+    <div id="context-menu" class="context-menu" hidden>
+        <button id="ctx-rename" class="context-menu-item" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span>Rename it</span>
+        </button>
+        <button id="ctx-download" class="context-menu-item" type="button">
+            <img src="/static/images/download.svg" alt="">
+            <span>Download</span>
+        </button>
+        <button id="ctx-share" class="context-menu-item" type="button">
+            <img src="/static/images/link.svg" alt="">
+            <span>Get link</span>
+        </button>
+        <button id="ctx-info" class="context-menu-item" type="button">
+            <img src="/static/images/info.svg" alt="">
+            <span>Details</span>
+        </button>
+        <div class="context-menu-sep"></div>
+        <button id="ctx-trash" class="context-menu-item danger" type="button">
+            <img src="/static/images/bin.svg" alt="">
+            <span>Move to trash</span>
+        </button>
+        <button id="ctx-restore" class="context-menu-item" type="button" hidden>
+            <img src="/static/images/restore.svg" alt="">
+            <span>Restore</span>
+        </button>
+        <button id="ctx-delete" class="context-menu-item danger" type="button" hidden>
+            <img src="/static/images/bin.svg" alt="">
+            <span>Delete permanently</span>
+        </button>
+    </div>
+
+    <!-- Rename Modal Dialog -->
+    <dialog id="rename-modal" class="info-dialog rename-dialog">
+        <div class="info-card">
+            <div class="info-header">
+                <h2>Rename item</h2>
+                <button id="rename-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            <form id="rename-form" class="rename-form">
+                <input type="hidden" id="rename-node-id" value="">
+                <div id="rename-form-error" class="share-form-error" style="display: none;"></div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="rename-input" style="font-size: 14px; color: var(--text-muted); margin-bottom: 6px; display: block;">Name</label>
+                    <input id="rename-input" type="text" required autocomplete="off" spellcheck="false" style="width: 100%; height: 42px; background: var(--bg-input); border: 1.5px solid transparent; border-radius: 12px; padding: 0 14px; color: #fff; font-size: 15px; outline: none;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn-cancel" id="rename-cancel" style="background: var(--bg-active); border: 0; border-radius: 12px; padding: 0 18px; height: 42px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;">Cancel</button>
+                    <button type="submit" class="btn-submit" style="margin: 0; width: auto; padding: 0 22px; height: 42px; font-size: 14px;">Rename</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    <!-- Upload Conflict Resolution Modal -->
+    <dialog id="conflict-modal" class="info-dialog conflict-dialog">
+        <div class="info-card conflict-card">
+            <div class="info-header">
+                <h2>File Already Exists</h2>
+                <button id="conflict-close" type="button" class="dialog-close" aria-label="Close">&times;</button>
+            </div>
+            <p class="conflict-desc">
+                A file named <strong id="conflict-filename" class="text-cyan">file.ext</strong> already exists in this folder. What would you like to do?
+            </p>
+            <div class="conflict-actions">
+                <button id="conflict-replace-btn" type="button" class="conflict-action-btn replace-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    <span>Replace existing file</span>
+                </button>
+                <button id="conflict-rename-btn" type="button" class="conflict-action-btn rename-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    <span>Rename (<span id="conflict-newname-preview">file (1).ext</span>)</span>
+                </button>
+                <button id="conflict-skip-btn" type="button" class="conflict-action-btn skip-btn">
+                    <span>Skip this file</span>
+                </button>
+            </div>
         </div>
     </dialog>
 

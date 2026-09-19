@@ -158,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/nodes/trash", s.require(s.csrf(s.trashNodes)))
 	mux.HandleFunc("POST /api/nodes/restore", s.require(s.csrf(s.restoreNodes)))
 	mux.HandleFunc("POST /api/nodes/move", s.require(s.csrf(s.moveNodes)))
+	mux.HandleFunc("POST /api/nodes/{id}/rename", s.require(s.csrf(s.renameNode)))
 	mux.HandleFunc("DELETE /api/nodes", s.require(s.csrf(s.deleteNodes)))
 	mux.HandleFunc("POST /api/nodes/download", s.require(s.csrf(s.downloadZip)))
 	mux.HandleFunc("GET /api/files/{id}/download", s.require(s.download))
@@ -646,7 +647,12 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		internalError(w, r, err)
 		return
 	}
-	n, err := s.files.Upload(r.Context(), p.UserID, r.FormValue("parent_id"), h.Filename, nodeID, f, s.cfg.MaxUploadBytes)
+	filename := r.FormValue("name")
+	if filename == "" {
+		filename = h.Filename
+	}
+	replace := r.FormValue("replace") == "true" || r.FormValue("replace") == "1"
+	n, err := s.files.UploadWithOptions(r.Context(), p.UserID, r.FormValue("parent_id"), filename, nodeID, f, s.cfg.MaxUploadBytes, replace)
 	if errors.Is(err, files.ErrNotFound) {
 		apiError(w, http.StatusNotFound, "not_found", "Folder not found.")
 		return
@@ -656,6 +662,30 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusCreated, n)
+}
+func (s *Server) renameNode(w http.ResponseWriter, r *http.Request) {
+	p, _ := s.principal(r)
+	var input struct {
+		Name string `json:"name"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	nodeID := r.PathValue("id")
+	if nodeID == "" {
+		apiError(w, http.StatusBadRequest, "invalid_id", "Item ID is required.")
+		return
+	}
+	n, err := s.files.Rename(r.Context(), p.UserID, nodeID, input.Name)
+	if errors.Is(err, files.ErrNotFound) {
+		apiError(w, http.StatusNotFound, "not_found", "Item not found.")
+		return
+	}
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid_name", err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, n)
 }
 func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	p, _ := s.principal(r)
@@ -1048,9 +1078,9 @@ func internalError(w http.ResponseWriter, r *http.Request, err error) {
 func (s *Server) headers(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'self'")
 		next.ServeHTTP(w, r)
 	})
 }

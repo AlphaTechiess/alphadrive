@@ -89,10 +89,14 @@ function iconFor(node) {
     if (node.kind === 'folder') return 'folder.svg';
     const name = (node.name || '').toLowerCase();
     if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico)$/.test(name)) return 'image.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz)$/.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma)$/.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|tiff?)$/.test(name)) return 'image.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/.test(name)) return 'code.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg)$/.test(name)) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/.test(name)) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/.test(name)) return 'sheet.svg';
     return 'files.svg';
 }
 
@@ -670,10 +674,14 @@ let isUploading = false;
 function iconForFilename(name) {
     name = (name || '').toLowerCase();
     if (name.endsWith('.pdf')) return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z)$/.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac)$/.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi)$/.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico)$/.test(name)) return 'image.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz)$/.test(name)) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma)$/.test(name)) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv)$/.test(name)) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|tiff?)$/.test(name)) return 'image.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/.test(name)) return 'code.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg)$/.test(name)) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/.test(name)) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/.test(name)) return 'sheet.svg';
     return 'files.svg';
 }
 

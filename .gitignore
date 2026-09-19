@@ -32,7 +32,7 @@ profile.cov
 *.zip
 
 # Go workspace and vendor
-vendor/
+/vendor/
 go.work
 go.work.sum
 

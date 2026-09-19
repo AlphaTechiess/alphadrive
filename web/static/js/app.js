@@ -114,18 +114,20 @@ function formatDate(dateStr) {
     }
 }
 
-function iconFor(node) {
-    if (node.kind === 'folder') return 'folder.svg';
-    const name = (node.name || '').toLowerCase();
-    if (name.endsWith('.pdf') || node.mime_type === 'application/pdf') return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) return 'image.svg';
-    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name)) return 'code.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name)) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/i.test(name)) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name)) return 'sheet.svg';
+function iconFor(item) {
+    if (!item) return 'files.svg';
+    if (typeof item === 'object' && item.kind === 'folder') return 'folder.svg';
+    const name = (typeof item === 'string' ? item : (item.name || '')).toLowerCase();
+    const mime = typeof item === 'object' ? (item.mime_type || '').toLowerCase() : '';
+    if (name.endsWith('.pdf') || mime === 'application/pdf') return 'pdf.svg';
+    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name) || mime.includes('zip') || mime.includes('tar') || mime.includes('compressed')) return 'zip.svg';
+    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name) || mime.startsWith('audio/')) return 'audio.svg';
+    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name) || mime.startsWith('video/')) return 'video.svg';
+    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name) || mime.startsWith('image/')) return 'image.svg';
+    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name) || mime.includes('word') || mime.includes('document')) return 'doc.svg';
+    if (/\.(pptx?|odp|key)$/i.test(name) || mime.includes('presentation') || mime.includes('powerpoint')) return 'ppt.svg';
+    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name) || mime.includes('spreadsheet') || mime.includes('excel') || mime.includes('csv')) return 'sheet.svg';
+    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name) || mime.includes('json') || mime.includes('javascript') || mime.includes('xml')) return 'code.svg';
     return 'files.svg';
 }
 
@@ -700,19 +702,6 @@ const uploadProgressClose = document.querySelector('#upload-progress-close');
 let uploadQueue = [];
 let isUploading = false;
 
-function iconForFilename(name) {
-    name = (name || '').toLowerCase();
-    if (name.endsWith('.pdf')) return 'pdf.svg';
-    if (/\.(zip|tar|gz|rar|7z|bz2|xz|iso|bin|tgz|z)$/i.test(name)) return 'zip.svg';
-    if (/\.(mp3|wav|ogg|m4a|flac|aac|wma|opus|weba|mid|midi)$/i.test(name)) return 'audio.svg';
-    if (/\.(mp4|mov|webm|mkv|avi|flv|wmv|m4v|ogv|3gp|ts)$/i.test(name)) return 'video.svg';
-    if (/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|tiff?|jfif|heic)$/i.test(name)) return 'image.svg';
-    if (/\.(json|js|ts|jsx|tsx|go|py|java|c|cpp|h|cs|php|rb|rs|swift|kt|html?|css|scss|sass|less|sql|ya?ml|sh|bash|zsh|bat|ps1|xml|env)$/i.test(name)) return 'code.svg';
-    if (/\.(docx?|odt|pages|rtf|txt|md|log|ini|conf|cfg|epub)$/i.test(name)) return 'doc.svg';
-    if (/\.(pptx?|odp|key)$/i.test(name)) return 'ppt.svg';
-    if (/\.(xlsx?|csv|tsv|ods|numbers)$/i.test(name)) return 'sheet.svg';
-    return 'files.svg';
-}
 
 function uploadWithXHR(item, onProgress) {
     return new Promise((resolve, reject) => {
@@ -826,7 +815,7 @@ function renderUploadQueue() {
 
         const pct = item.total > 0 ? Math.min(100, Math.round((item.loaded / item.total) * 100)) : 0;
         const displayName = item.customName || item.relPath || item.file.webkitRelativePath || item.file.name;
-        const icon = iconForFilename(item.customName || item.file.name);
+        const icon = iconFor(item.customName || item.file.name);
 
         const li = document.createElement('li');
         li.className = 'upload-item-row';
@@ -1812,7 +1801,11 @@ function renderUnsupportedFallback(container, node, downloadUrl) {
 async function renderSpreadsheetPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering spreadsheet…</p>';
     if (typeof window.XLSX === 'undefined') {
-        await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+        try {
+            await loadScript('/static/js/vendor/xlsx.full.min.js');
+        } catch (e) {
+            await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+        }
     }
     const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
     const sheetNames = workbook.SheetNames || [];
@@ -1916,7 +1909,11 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
 async function renderDocxPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering document…</p>';
     if (typeof window.mammoth === 'undefined') {
-        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+        try {
+            await loadScript('/static/js/vendor/mammoth.browser.min.js');
+        } catch (e) {
+            await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+        }
     }
     const result = await window.mammoth.convertToHtml({ arrayBuffer });
     const html = (result && result.value) || '';
@@ -1943,7 +1940,11 @@ async function renderDocxPreview(container, arrayBuffer) {
 async function renderZipPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Reading archive…</p>';
     if (typeof window.JSZip === 'undefined') {
-        await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        try {
+            await loadScript('/static/js/vendor/jszip.min.js');
+        } catch (e) {
+            await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        }
     }
     const zip = await window.JSZip.loadAsync(arrayBuffer);
     const files = [];
@@ -1968,7 +1969,7 @@ async function renderZipPreview(container, arrayBuffer) {
 
     let rowsHtml = '';
     files.forEach(f => {
-        const icon = f.isDir ? 'folder.svg' : iconForFilename(f.name);
+        const icon = f.isDir ? 'folder.svg' : iconFor(f.name);
         rowsHtml += `
             <tr>
                 <td>
@@ -2008,7 +2009,11 @@ async function renderZipPreview(container, arrayBuffer) {
 
 async function renderMarkdownPreview(container, text) {
     if (typeof window.marked === 'undefined') {
-        await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
+        try {
+            await loadScript('/static/js/vendor/marked.min.js');
+        } catch (e) {
+            await loadScript('https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js');
+        }
     }
     const html = window.marked.parse(text);
     container.innerHTML = `

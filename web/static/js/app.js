@@ -1766,7 +1766,7 @@ function loadScript(src) {
     return new Promise((resolve, reject) => {
         const existing = document.querySelector(`script[src="${src}"]`);
         if (existing) {
-            if (existing.dataset.loaded === 'true' || existing.readyState === 'complete' || existing.readyState === 'loaded') {
+            if (existing.dataset.loaded === 'true' || document.readyState === 'complete' || document.readyState === 'interactive') {
                 return resolve();
             }
             existing.addEventListener('load', () => {
@@ -1774,7 +1774,7 @@ function loadScript(src) {
                 resolve();
             }, { once: true });
             existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
-            setTimeout(() => resolve(), 100);
+            setTimeout(() => resolve(), 300);
             return;
         }
         const script = document.createElement('script');
@@ -1789,13 +1789,14 @@ function loadScript(src) {
     });
 }
 
-function renderUnsupportedFallback(container, node, downloadUrl) {
+function renderUnsupportedFallback(container, node, downloadUrl, reason) {
+    const hint = reason ? `Preview unavailable (${esc(reason)})` : 'Preview is not available for this file format.';
     container.innerHTML = `
         <div class="preview-unsupported-box">
             <img src="/static/images/${iconFor(node)}" alt="" class="preview-unsupported-icon">
             <p class="preview-unsupported-name">${esc(node.name)}</p>
             <p class="preview-unsupported-size">${formatBytes(node.size_bytes)}</p>
-            <p class="preview-unsupported-hint">Preview is not available for this file format.</p>
+            <p class="preview-unsupported-hint">${hint}</p>
             <a href="${downloadUrl}" download="${esc(node.name)}" class="btn-submit preview-download-cta">Download File</a>
         </div>
     `;
@@ -1916,38 +1917,97 @@ async function renderSpreadsheetPreview(container, arrayBuffer) {
 
 async function renderDocxPreview(container, arrayBuffer) {
     container.innerHTML = '<p class="grid-status">Rendering document…</p>';
+
+    // Ensure JSZip is loaded first
+    const getJSZip = () => window.JSZip || (typeof JSZip !== 'undefined' ? JSZip : null);
+    if (!getJSZip()) {
+        try {
+            await loadScript('/static/js/vendor/jszip.min.js');
+        } catch (e) {
+            try {
+                await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+            } catch (_) {}
+        }
+    }
+
+    // Try docx-preview first for high-fidelity Word page rendering
+    const getDocx = () => window.docx || (typeof docx !== 'undefined' ? docx : null);
+    if (!getDocx()) {
+        try {
+            await loadScript('/static/js/vendor/docx-preview.min.js');
+        } catch (e) {
+            try {
+                await loadScript('https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js');
+            } catch (_) {}
+        }
+    }
+
+    const docxLib = getDocx();
+    if (docxLib && typeof docxLib.renderAsync === 'function') {
+        try {
+            container.innerHTML = `
+                <div class="preview-doc-wrapper">
+                    <div class="preview-doc-target" id="docx-target"></div>
+                </div>
+            `;
+            const targetEl = container.querySelector('#docx-target');
+            await docxLib.renderAsync(arrayBuffer, targetEl, null, {
+                className: 'docx-page',
+                inWrapper: false,
+                ignoreWidth: false,
+                ignoreHeight: false,
+                breakPages: true,
+                experimental: true,
+                trimXmlDeclaration: true,
+                useBase64URL: true,
+                renderHeaders: true,
+                renderFooters: true,
+                renderFootnotes: true,
+                renderEndnotes: true
+            });
+            return;
+        } catch (renderErr) {
+            console.warn('docx-preview failed, attempting Mammoth fallback:', renderErr);
+        }
+    }
+
+    // Secondary fallback: Mammoth
     const getMammoth = () => window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
     if (!getMammoth()) {
         try {
             await loadScript('/static/js/vendor/mammoth.browser.min.js');
         } catch (e) {
-            await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+            try {
+                await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+            } catch (_) {}
         }
     }
     const mammothLib = getMammoth();
-    if (!mammothLib) {
-        throw new Error('Word document renderer is not available');
-    }
-    const result = await mammothLib.convertToHtml({ arrayBuffer });
-    const html = (result && result.value) || '';
-    if (!html.trim()) {
+    if (mammothLib && typeof mammothLib.convertToHtml === 'function') {
+        const result = await mammothLib.convertToHtml({ arrayBuffer });
+        const html = (result && result.value) || '';
+        if (!html.trim()) {
+            container.innerHTML = `
+                <div class="preview-doc-wrapper">
+                    <div class="preview-doc-container">
+                        <p style="color: #666; font-style: italic;">This document appears to be empty.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         container.innerHTML = `
             <div class="preview-doc-wrapper">
                 <div class="preview-doc-container">
-                    <p style="color: #666; font-style: italic;">This document appears to be empty.</p>
+                    ${html}
                 </div>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = `
-        <div class="preview-doc-wrapper">
-            <div class="preview-doc-container">
-                ${html}
-            </div>
-        </div>
-    `;
+    throw new Error('Word document renderer could not process this document');
 }
 
 async function renderZipPreview(container, arrayBuffer) {
@@ -2092,12 +2152,12 @@ async function openPreview(node) {
     } else if (/\.(docx?|dotx?|docm|dotm)$/i.test(name) || mime.includes('word') || mime.includes('wordprocessingml')) {
         try {
             const resp = await fetch(viewUrl);
-            if (!resp.ok) throw new Error('Could not load document');
+            if (!resp.ok) throw new Error(`Could not load document (${resp.status} ${resp.statusText})`);
             const arrayBuffer = await resp.arrayBuffer();
             await renderDocxPreview(previewBody, arrayBuffer);
         } catch (err) {
             console.error('DOCX preview failed:', err);
-            renderUnsupportedFallback(previewBody, node, downloadUrl);
+            renderUnsupportedFallback(previewBody, node, downloadUrl, err.message);
         }
     } else if (/\.zip$/i.test(name) || mime === 'application/zip' || mime === 'application/x-zip-compressed') {
         try {

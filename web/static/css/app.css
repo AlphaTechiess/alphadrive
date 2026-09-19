@@ -1667,16 +1667,46 @@ button, input {
     max-height: 72vh;
     overflow-y: auto;
     border-radius: 12px;
-    background: #ffffff;
+    background: #eef2f6;
     box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    box-sizing: border-box;
+}
+
+.preview-doc-target {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.preview-doc-target section,
+.preview-doc-target .docx-page,
+.preview-doc-target .docx-wrapper > section {
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18) !important;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
 }
 
 .preview-doc-container {
-    padding: 36px 44px;
+    width: 100%;
+    max-width: 850px;
+    background: #ffffff;
+    padding: 44px 52px;
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
     color: #1a202c;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-size: 15px;
     line-height: 1.7;
+    box-sizing: border-box;
 }
 
 .preview-doc-container h1,
